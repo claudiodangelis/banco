@@ -21,6 +21,7 @@ func init() {
 	// Loop through modules
 	for _, m := range module.All() {
 		newCmd.AddCommand(m.CmdNew())
+		listCmd.AddCommand(m.CmdList())
 	}
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(checkCmd)

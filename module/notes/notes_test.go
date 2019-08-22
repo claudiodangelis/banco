@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestNew(t *testing.T) {
@@ -144,6 +145,60 @@ func Test_get(t *testing.T) {
 			}
 			if tt.want.Size != got.Size {
 				t.Errorf("get() = %v, want %v", got.Size, tt.want.Size)
+			}
+		})
+	}
+}
+
+func Test_list(t *testing.T) {
+	_, caller, _, _ := runtime.Caller(0)
+	dir := filepath.Dir(caller)
+	os.Chdir(filepath.Join(dir, "test_data/test04"))
+	tests := []struct {
+		name    string
+		want    []Note
+		wantErr bool
+	}{
+		{"first", []Note{
+			Note{
+				Title:     "hello",
+				Label:     "",
+				Size:      3,
+				UpdatedAt: time.Unix(0, 0),
+			},
+			Note{
+				Title:     "20190101-discussing-about-tools",
+				Label:     "meetings",
+				Size:      25,
+				UpdatedAt: time.Unix(0, 0),
+			},
+			Note{
+				Title:     "20190102-expenses",
+				Label:     "meetings",
+				Size:      19,
+				UpdatedAt: time.Unix(0, 0),
+			},
+			Note{
+				Title:     "things-to-do",
+				Label:     "misc",
+				Size:      19,
+				UpdatedAt: time.Unix(0, 0),
+			},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := list()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("list() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			// TODO: Find a workaround for this
+			for i := range got {
+				got[i].UpdatedAt = time.Unix(0, 0)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("list() = %+v, want %+v", got, tt.want)
 			}
 		})
 	}

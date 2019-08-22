@@ -78,6 +78,30 @@ func validateLabel(label string) (bool, error) {
 	return true, nil
 }
 
+// Return a list of notes
+func list() ([]Note, error) {
+	var notes []Note
+	if err := filepath.Walk("notes", func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		note := Note{
+			Title:     info.Name(),
+			Size:      info.Size(),
+			UpdatedAt: info.ModTime(),
+		}
+		label := filepath.Dir(strings.TrimPrefix(path, "notes/"))
+		if label != "." {
+			note.Label = label
+		}
+		notes = append(notes, note)
+		return nil
+	}); err != nil {
+		return notes, err
+	}
+	return notes, nil
+}
+
 func create(title, label string) error {
 	if label != "" {
 		if err := os.MkdirAll("notes/"+label, os.ModePerm); err != nil {

@@ -1,6 +1,7 @@
 package notes
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -15,7 +16,46 @@ func (b Module) CmdUpdate() *cobra.Command {
 
 // CmdList lists notes
 func (b Module) CmdList() *cobra.Command {
-	return nil
+	cmd := &cobra.Command{
+		Use:   "notes",
+		Short: "list notes",
+		Long:  "list notes",
+		Run: func(cmd *cobra.Command, args []string) {
+			notes, err := list()
+			if err != nil {
+				panic(err)
+			}
+			mapped := make(map[string][]Note)
+			for _, note := range notes {
+				label := note.Label
+				if label == "" {
+					label = "."
+				}
+				if _, ok := mapped[label]; !ok {
+					mapped[label] = []Note{}
+				}
+				mapped[label] = append(mapped[label], note)
+			}
+			// Show root notes first
+			rootnotes, ok := mapped["."]
+			if ok {
+				for _, note := range rootnotes {
+					fmt.Println(note.Title)
+				}
+			}
+			// Show other notes
+			for label, notes := range mapped {
+				if label == "." {
+					continue
+				}
+				fmt.Println("[" + label + "]")
+				for _, note := range notes {
+					fmt.Println(" ", note.Title)
+				}
+			}
+		},
+	}
+	return cmd
 }
 
 // CmdDelete deletes a note
