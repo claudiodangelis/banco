@@ -3,6 +3,7 @@ package notes
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,6 +15,11 @@ type Note struct {
 	UpdatedAt time.Time
 	Size      int64
 	Label     string
+}
+
+// Path of the note
+func (n Note) Path() string {
+	return filepath.Join("notes", n.Label, n.Title)
 }
 
 // Module module
@@ -51,6 +57,18 @@ func get(title, label string) (Note, error) {
 	n.Size = s.Size()
 	n.UpdatedAt = s.ModTime()
 	return n, nil
+}
+
+func open(note Note) error {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		return errors.New("$EDITOR is not defined")
+	}
+	cmd := exec.Command(editor, note.Path())
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	return err
 }
 
 func validateLabel(label string) (bool, error) {

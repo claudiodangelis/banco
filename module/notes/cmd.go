@@ -54,14 +54,14 @@ func (b Module) CmdNew() *cobra.Command {
 			if title == "" {
 				result, err := util.AskInput("Title")
 				if err != nil {
-					panic(err)
+					log.Fatalln(err)
 				}
 				title = result
 			}
 			if interactive {
 				result, err := util.AskInput("Label (subfolder)")
 				if err != nil {
-					panic(err)
+					log.Fatalln(err)
 				}
 				label = result
 			}
@@ -70,7 +70,16 @@ func (b Module) CmdNew() *cobra.Command {
 				log.Fatal(err)
 			}
 			if err := create(title, label); err != nil {
-				panic(err)
+				log.Fatalln(err)
+			}
+			// TODO: there should be a flag if you do not want to open it
+			// Open note
+			note, err := get(title, label)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			if err := open(note); err != nil {
+				log.Fatalln(err)
 			}
 		},
 	}
