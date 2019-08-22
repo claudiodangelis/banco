@@ -7,6 +7,7 @@ import (
 
 // Module is a module
 type Module interface {
+	CmdRoot() *cobra.Command
 	CmdUpdate() *cobra.Command
 	CmdList() *cobra.Command
 	CmdDelete() *cobra.Command

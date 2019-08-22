@@ -6,8 +6,40 @@ import (
 	"strings"
 
 	"github.com/claudiodangelis/banco/util"
+	"github.com/isacikgoz/promptui"
 	"github.com/spf13/cobra"
 )
+
+// CmdRoot sets the root for this command (interactive searching note)
+func (b Module) CmdRoot() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "notes",
+		Short: "manage notes",
+		Long:  "manage notes",
+		Run: func(cmd *cobra.Command, args []string) {
+			items := []string{}
+			notes, err := list()
+			if err != nil {
+				panic(err)
+			}
+			mapped := make(map[string]Note)
+			for _, note := range notes {
+				mapped[note.Path()] = note
+				items = append(items, note.Path())
+			}
+			prompt := promptui.Select{
+				Label: "Choose note:",
+				Items: items,
+			}
+			_, result, err := prompt.Run()
+			if err != nil {
+				panic(err)
+			}
+			open(mapped[result])
+		},
+	}
+	return cmd
+}
 
 // CmdUpdate updates a note
 func (b Module) CmdUpdate() *cobra.Command {

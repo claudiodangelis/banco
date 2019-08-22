@@ -2,6 +2,16 @@ package tasks
 
 import "github.com/spf13/cobra"
 
+// CmdRoot sets the root for this command (interactive searching note)
+func (b Module) CmdRoot() *cobra.Command {
+	return nil
+}
+
+// CmdRoot sets the root for this command (interactive searching note)
+func (b Module) CmdRoot() *cobra.Command {
+	return nil
+}
+
 // CmdUpdate updates a task
 func (b Module) CmdUpdate() *cobra.Command {
 	return nil

@@ -17,12 +17,13 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(initCmd)
 	// Loop through modules
 	for _, m := range module.All() {
 		newCmd.AddCommand(m.CmdNew())
 		listCmd.AddCommand(m.CmdList())
+		rootCmd.AddCommand(m.CmdRoot())
 	}
+	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(openCmd)
