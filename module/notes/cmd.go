@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/claudiodangelis/banco/util"
-	"github.com/isacikgoz/promptui"
 	"github.com/spf13/cobra"
 )
 
@@ -17,25 +16,11 @@ func (b Module) CmdRoot() *cobra.Command {
 		Short: "manage notes",
 		Long:  "manage notes",
 		Run: func(cmd *cobra.Command, args []string) {
-			items := []string{}
-			notes, err := list()
+			note, err := notePicker()
 			if err != nil {
 				panic(err)
 			}
-			mapped := make(map[string]Note)
-			for _, note := range notes {
-				mapped[note.Path()] = note
-				items = append(items, note.Path())
-			}
-			prompt := promptui.Select{
-				Label: "Choose note:",
-				Items: items,
-			}
-			_, result, err := prompt.Run()
-			if err != nil {
-				panic(err)
-			}
-			open(mapped[result])
+			open(note)
 		},
 	}
 	return cmd
@@ -92,7 +77,21 @@ func (b Module) CmdList() *cobra.Command {
 
 // CmdDelete deletes a note
 func (b Module) CmdDelete() *cobra.Command {
-	return nil
+	cmd := &cobra.Command{
+		Use:   "note",
+		Short: "deletes a note",
+		Long:  "Deletes a note. If the note has a label and it's the only note with that label, label is deleted",
+		Run: func(cmd *cobra.Command, args []string) {
+			note, err := notePicker()
+			if err != nil {
+				panic(err)
+			}
+			if err := delete(note); err != nil {
+				log.Fatalln(err)
+			}
+		},
+	}
+	return cmd
 }
 
 // CmdOpen open a note
@@ -116,6 +115,7 @@ func (b Module) CmdNew() *cobra.Command {
 		Short: "creates new note",
 		Long:  "creates new note",
 		Run: func(cmd *cobra.Command, args []string) {
+			// TODO: It should always be interactive
 			// Check if the `--interactive` flag is passed
 			if interactive {
 				label, title = "", ""

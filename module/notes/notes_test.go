@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/otiai10/copy"
 )
 
 func TestNew(t *testing.T) {
@@ -201,5 +203,54 @@ func Test_list(t *testing.T) {
 				t.Errorf("list() = %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func Test_delete(t *testing.T) {
+	_, caller, _, _ := runtime.Caller(0)
+	dir := filepath.Dir(caller)
+	// Create a temporary directory
+	tmpdir, err := ioutil.TempDir("", "banconotes")
+	if err != nil {
+		panic(err)
+	}
+	// Copy test cases over
+	if err := copy.Copy(filepath.Join(dir, "test_data/test05"), tmpdir); err != nil {
+		panic(err)
+	}
+	// Change to the test directory
+	os.Chdir(tmpdir)
+	type args struct {
+		note Note
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"remove non existing note", args{note: Note{}}, true},
+		{"remove root note", args{note: Note{Title: "hello"}}, false},
+		{"remove nested note and empty parent", args{note: Note{Title: "things-to-do", Label: "misc"}}, false},
+		{"remove nested note and empty parents of parent", args{note: Note{Title: "hiding", Label: "sub/fol/der"}}, false},
+		{"remove nested note and empty parents of parent", args{note: Note{Title: "hiding", Label: "sub2/fol/der"}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := delete(tt.args.note); (err != nil) != tt.wantErr {
+				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+	// TODO: This is not the most consitent way of carrying out this test
+	// Check if the notes/sub folder has been deleted
+	if _, err := os.Stat("notes/sub"); !os.IsNotExist(err) {
+		t.Errorf("notes/sub should have been deleted")
+	}
+	if _, err := os.Stat("notes/sub2/fol"); err != nil {
+		t.Errorf("notes/sub2/fol should not have been deleted")
+	}
+	// Delete tmp directory
+	if err := os.RemoveAll(tmpdir); err != nil {
+		panic(err)
 	}
 }

@@ -3,7 +3,7 @@ package util
 import (
 	"io/ioutil"
 
-	"github.com/isacikgoz/promptui"
+	"github.com/manifoldco/promptui"
 )
 
 // IsEmptyDir returns (true, nil) if dir is empty, (false, error) otherwise

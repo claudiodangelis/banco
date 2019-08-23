@@ -2,6 +2,7 @@ package notes
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -119,5 +120,38 @@ func create(title, label string) error {
 		return err
 	}
 	defer f.Close()
+	return nil
+}
+
+func delete(note Note) error {
+	// TODO: We should have a proper function to check if it exists
+	if note.Title == "" {
+		return errors.New("note does not exist")
+	}
+	// Delete the note if it exists
+	if err := os.Remove(note.Path()); err != nil {
+		return err
+	}
+	// If directory is empty, delete directory
+	contents, err := ioutil.ReadDir(filepath.Dir(note.Path()))
+	if err != nil {
+		return err
+	}
+	if len(contents) > 0 {
+		// Directory is not empty
+		return nil
+	}
+	// Recursively check if label and its parents are empty, if so, delete them
+	dir := filepath.Dir(note.Path())
+	for {
+		if err := os.Remove(dir); err != nil {
+			// TODO: this is not the strongest option
+			return nil
+		}
+		dir = filepath.Dir(dir)
+		if dir == "notes" {
+			break
+		}
+	}
 	return nil
 }
