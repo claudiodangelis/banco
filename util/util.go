@@ -3,8 +3,17 @@ package util
 import (
 	"io/ioutil"
 
+	"github.com/buger/goterm"
 	"github.com/manifoldco/promptui"
 )
+
+// ClearScreen clears the screen
+func ClearScreen() {
+	// TODO: This will go away when we have a proper gui
+	goterm.Clear()
+	goterm.MoveCursor(1, 1)
+	goterm.Flush()
+}
 
 // IsEmptyDir returns (true, nil) if dir is empty, (false, error) otherwise
 // Credits: https://rosettacode.org/wiki/Empty_directory#Go

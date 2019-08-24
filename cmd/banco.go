@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/claudiodangelis/banco/util"
+
 	"github.com/claudiodangelis/banco/module"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -14,6 +16,7 @@ var rootCmd = &cobra.Command{
 	Short: "Launch banco",
 	Long:  "Launch banco",
 	Run: func(cmd *cobra.Command, args []string) {
+		util.ClearScreen()
 		// Show summaries
 		modules := make(map[string]module.Module)
 		modulesSlice := []string{}
@@ -33,6 +36,7 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			panic(err)
 		}
+		util.ClearScreen()
 		modules[result].CmdRoot().Execute()
 	},
 }
