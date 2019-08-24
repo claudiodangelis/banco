@@ -49,6 +49,7 @@ func init() {
 		rootCmd.AddCommand(m.CmdRoot())
 		deleteCmd.AddCommand(m.CmdDelete())
 		updateCmd.AddCommand(m.CmdUpdate())
+		openCmd.AddCommand(m.CmdOpen())
 	}
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(newCmd)

@@ -163,7 +163,21 @@ func (b Module) CmdDelete() *cobra.Command {
 
 // CmdOpen open a note
 func (b Module) CmdOpen() *cobra.Command {
-	return nil
+	cmd := &cobra.Command{
+		Use:   "note",
+		Short: "open a note",
+		Long:  "open a note",
+		Run: func(cmd *cobra.Command, args []string) {
+			note, err := notePicker()
+			if err != nil {
+				panic(err)
+			}
+			if err := open(note); err != nil {
+				panic(err)
+			}
+		},
+	}
+	return cmd
 }
 
 // CmdCheck checks module's sanity
