@@ -180,11 +180,6 @@ func (b Module) CmdOpen() *cobra.Command {
 	return cmd
 }
 
-// CmdCheck checks module's sanity
-func (b Module) CmdCheck() *cobra.Command {
-	return nil
-}
-
 var interactive bool
 var title string
 var label string

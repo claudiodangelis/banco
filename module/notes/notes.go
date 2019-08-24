@@ -41,6 +41,10 @@ func (b Module) Init() error {
 
 // Check sanity of module
 func (b Module) Check() error {
+	// Check if directory notes exist
+	if _, err := ioutil.ReadDir("notes"); err != nil {
+		return err
+	}
 	return nil
 }
 

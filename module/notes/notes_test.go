@@ -341,3 +341,33 @@ func Test_rename(t *testing.T) {
 		})
 	}
 }
+
+func TestModule_Check(t *testing.T) {
+	tmpdir1, err := ioutil.TempDir("", "banconotes")
+	if err != nil {
+		panic(err)
+	}
+	tmpdir2, err := ioutil.TempDir("", "banconotes")
+	if err != nil {
+		panic(err)
+	}
+	os.MkdirAll(filepath.Join(tmpdir1, "notes"), os.ModePerm)
+	tests := []struct {
+		testdir string
+		name    string
+		b       Module
+		wantErr bool
+	}{
+		{tmpdir1, "existing", Module{}, false},
+		{tmpdir2, "not existing", Module{}, true},
+	}
+	for _, tt := range tests {
+		os.Chdir(tt.testdir)
+		t.Run(tt.name, func(t *testing.T) {
+			b := Module{}
+			if err := b.Check(); (err != nil) != tt.wantErr {
+				t.Errorf("Module.Check() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
