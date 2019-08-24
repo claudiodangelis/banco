@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/claudiodangelis/banco/module"
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 )
 
@@ -13,6 +14,26 @@ var rootCmd = &cobra.Command{
 	Short: "Launch banco",
 	Long:  "Launch banco",
 	Run: func(cmd *cobra.Command, args []string) {
+		// Show summaries
+		modules := make(map[string]module.Module)
+		modulesSlice := []string{}
+		for _, m := range module.All() {
+			modules[m.Name()] = m
+			modulesSlice = append(modulesSlice, m.Name())
+			if err := m.CmdSummary().Execute(); err != nil {
+				panic(err)
+			}
+		}
+		// Prompt modules
+		prompt := promptui.Select{
+			Label: "Modules",
+			Items: modulesSlice,
+		}
+		_, result, err := prompt.Run()
+		if err != nil {
+			panic(err)
+		}
+		modules[result].CmdRoot().Execute()
 	},
 }
 

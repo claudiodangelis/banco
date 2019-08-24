@@ -254,3 +254,34 @@ func Test_delete(t *testing.T) {
 		panic(err)
 	}
 }
+
+func Test_summary(t *testing.T) {
+	_, caller, _, _ := runtime.Caller(0)
+	dir := filepath.Dir(caller)
+	tests := []struct {
+		testdir string
+		name    string
+		want    string
+		wantErr bool
+	}{
+		{"test_data/test01", "no labels", "Notes: 1, Labels: 0", false},
+		{"test_data/test02", "one label", "Notes: 1, Labels: 1", false},
+		{"test_data/test03", "one nested label", "Notes: 1, Labels: 1", false},
+		{"test_data/testxx", "not existing", "", true},
+	}
+	for _, tt := range tests {
+		if err := os.Chdir(filepath.Join(dir, tt.testdir)); err != nil {
+			panic(err)
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := summary()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("summary() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("summary() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

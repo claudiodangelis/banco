@@ -2,6 +2,7 @@ package notes
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -46,6 +47,21 @@ func New() Module {
 	return Module{}
 }
 
+// summary of the module's items
+func summary() (string, error) {
+	// Get all notes
+	notes, err := list()
+	if err != nil {
+		return "", err
+	}
+	labels := make(map[string]int)
+	for _, note := range notes {
+		if note.Label != "" {
+			labels[note.Label]++
+		}
+	}
+	return fmt.Sprintf("Notes: %d, Labels: %d", len(notes), len(labels)), nil
+}
 func get(title, label string) (Note, error) {
 	n := Note{}
 	filename := filepath.Join("notes", label, title)
@@ -82,6 +98,9 @@ func validateLabel(label string) (bool, error) {
 // Return a list of notes
 func list() ([]Note, error) {
 	var notes []Note
+	if _, err := os.Stat("notes"); os.IsNotExist(err) {
+		return nil, err
+	}
 	if err := filepath.Walk("notes", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
