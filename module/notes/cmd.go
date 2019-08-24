@@ -8,6 +8,10 @@ import (
 	"github.com/claudiodangelis/banco/util"
 	"github.com/spf13/cobra"
 )
+// CmdSummary returns a single line summary of the module's items
+func (b Module) CmdSummary() *cobra.Command {
+	return nil
+}
 
 // CmdRoot sets the root for this command (interactive searching note)
 func (b Module) CmdRoot() *cobra.Command {
