@@ -267,7 +267,6 @@ func Test_summary(t *testing.T) {
 		{"test_data/test01", "no labels", "Notes: 1, Labels: 0", false},
 		{"test_data/test02", "one label", "Notes: 1, Labels: 1", false},
 		{"test_data/test03", "one nested label", "Notes: 1, Labels: 1", false},
-		{"test_data/testxx", "not existing", "", true},
 	}
 	for _, tt := range tests {
 		if err := os.Chdir(filepath.Join(dir, tt.testdir)); err != nil {
@@ -281,6 +280,63 @@ func Test_summary(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("summary() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_rename(t *testing.T) {
+	_, caller, _, _ := runtime.Caller(0)
+	dir := filepath.Dir(caller)
+	tmpdir, err := ioutil.TempDir("", "banconotes")
+	if err != nil {
+		panic(err)
+	}
+	if err := copy.Copy(filepath.Join(dir, "test_data/test04"), tmpdir); err != nil {
+		panic(err)
+	}
+	if err := os.Chdir(tmpdir); err != nil {
+		panic(err)
+	}
+	type args struct {
+		current Note
+		next    Note
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"move note to existing subfolder", args{current: Note{
+			Title: "hello",
+		}, next: Note{
+			Title: "hello",
+			Label: "meetings",
+		}}, false},
+		{"rename note and move to a non existing subfolder", args{current: Note{
+			Title: "things-to-do",
+			Label: "misc",
+		}, next: Note{
+			Title: "things-done",
+			Label: "misc/done",
+		}}, false},
+		{"move nested note to existing parent", args{current: Note{
+			Title: "things-done",
+			Label: "misc/done",
+		}, next: Note{
+			Title: "things-done",
+		}}, false},
+		{"move note to a subfolder containing a note with the same name", args{current: Note{
+			Title: "things-done",
+		}, next: Note{
+			Title: "hello",
+			Label: "meetings",
+		}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := rename(tt.args.current, tt.args.next); (err != nil) != tt.wantErr {
+				t.Errorf("rename() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

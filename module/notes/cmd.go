@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/claudiodangelis/banco/util"
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +45,57 @@ func (b Module) CmdRoot() *cobra.Command {
 
 // CmdUpdate updates a note
 func (b Module) CmdUpdate() *cobra.Command {
-	return nil
+	cmd := &cobra.Command{
+		Use:   "note",
+		Short: "updates a note",
+		Long:  "updates a note",
+		Run: func(cmd *cobra.Command, args []string) {
+			// Prompt which note you want to update
+			note, err := notePicker()
+			if err != nil {
+				panic(err)
+			}
+			// Prompt what kind of update you want to make
+			prompt := promptui.Select{
+				Label: "What you want to do?",
+				Items: []string{"rename"},
+			}
+			_, result, err := prompt.Run()
+			if err != nil {
+				panic(err)
+			}
+			if result == "rename" {
+				// Prompt new title
+				pTitle := promptui.Prompt{
+					Label:     "Title",
+					Default:   note.Title,
+					AllowEdit: true,
+				}
+				title, err := pTitle.Run()
+				if err != nil {
+					panic(err)
+				}
+				// Prompt new label
+				pLabel := promptui.Prompt{
+					Label:     "Label",
+					Default:   note.Label,
+					AllowEdit: true,
+				}
+				label, err := pLabel.Run()
+				if err != nil {
+					panic(err)
+				}
+				newNote := Note{
+					Title: title,
+					Label: label,
+				}
+				if err := rename(note, newNote); err != nil {
+					panic(err)
+				}
+			}
+		},
+	}
+	return cmd
 }
 
 // CmdList lists notes

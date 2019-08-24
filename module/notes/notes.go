@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/otiai10/copy"
 )
 
 // Note represent a text note
@@ -93,6 +95,27 @@ func validateLabel(label string) (bool, error) {
 		return false, errors.New(`a label cannot start with "/"`)
 	}
 	return true, nil
+}
+
+// Rename a note
+func rename(current, next Note) error {
+	// create next directory
+	if err := os.MkdirAll(filepath.Join("notes", next.Label), os.ModePerm); err != nil {
+		return err
+	}
+	// check if file in the next directory already exists with that name
+	if _, err := os.Stat(filepath.Join("notes", next.Label, next.Title)); err == nil {
+		return errors.New("a note already exists with that name")
+	}
+	// copy current note to the next directory
+	if err := copy.Copy(current.Path(), next.Path()); err != nil {
+		return err
+	}
+	// delete old file (and it's parent, if empty)
+	if err := delete(current); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Return a list of notes
