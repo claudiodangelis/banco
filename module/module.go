@@ -2,6 +2,7 @@ package module
 
 import (
 	"github.com/claudiodangelis/banco/module/notes"
+	"github.com/claudiodangelis/banco/module/tasks"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,7 @@ func All() []Module {
 		notes.New(),
 		// bookmarks.New(),
 		// repos.New(),
-		// tasks.New(),
+		tasks.New(),
 		// documents.New(),
 	}
 }
