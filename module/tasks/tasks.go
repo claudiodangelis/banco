@@ -49,6 +49,10 @@ func (b Module) Check() error {
 
 // create a new task
 func create(task Task) error {
+	if task.Status == "" || task.Title == "" {
+		// TODO: Add a proper error message
+		return errors.New("invalid task")
+	}
 	// If it's a dir, create it
 	filename := filepath.Join("tasks", task.Status, task.Title)
 	if task.IsDir {

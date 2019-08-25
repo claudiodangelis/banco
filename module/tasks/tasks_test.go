@@ -42,6 +42,13 @@ func TestModule_Init(t *testing.T) {
 }
 
 func Test_create(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "bancotasks")
+	if err != nil {
+		panic(err)
+	}
+	os.Chdir(tmpdir)
+	m := New()
+	m.Init()
 	type args struct {
 		task Task
 	}
@@ -49,7 +56,32 @@ func Test_create(t *testing.T) {
 		name    string
 		args    args
 		wantErr bool
-	}{}
+	}{
+		{"create new task", args{
+			task: Task{
+				Title:  "task1",
+				Status: m.statuses[0],
+			},
+		}, false},
+		{"create new task with an existing name", args{
+			task: Task{
+				Title:  "task1",
+				Status: m.statuses[0],
+			},
+		}, true},
+		{"create new task which is a dir", args{
+			task: Task{
+				Title:  "task2",
+				IsDir:  true,
+				Status: m.statuses[0],
+			},
+		}, false},
+		{"create a new task without a status", args{
+			task: Task{
+				Title: "nope",
+			},
+		}, true},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := create(tt.args.task); (err != nil) != tt.wantErr {
