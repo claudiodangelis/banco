@@ -2,7 +2,9 @@ package tasks
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 )
@@ -20,6 +22,11 @@ type Task struct {
 	IsDir     bool
 	UpdatedAt time.Time
 	Size      int64
+}
+
+// Path to the task
+func (t Task) Path() string {
+	return filepath.Join("tasks", t.Status, t.Title)
 }
 
 // Name of this module
@@ -45,6 +52,21 @@ func (b Module) Init() error {
 // Check checks module's sanity
 func (b Module) Check() error {
 	return nil
+}
+
+// statuses get the list of statuses
+func statuses() ([]string, error) {
+	var statuses []string
+	contents, err := ioutil.ReadDir("tasks")
+	if err != nil {
+		return statuses, err
+	}
+	for _, content := range contents {
+		if content.IsDir() {
+			statuses = append(statuses, content.Name())
+		}
+	}
+	return statuses, nil
 }
 
 // create a new task
@@ -73,6 +95,19 @@ func create(task Task) error {
 	}
 	defer f.Close()
 	return nil
+}
+
+// open a task
+func open(task Task) error {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		return errors.New("$EDITOR is not defined")
+	}
+	cmd := exec.Command(editor, task.Path())
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	return err
 }
 
 // New module

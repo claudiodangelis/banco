@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+    "log"
 
-	"github.com/claudiodangelis/banco/util"
-
+    "github.com/claudiodangelis/banco/util"
 	"github.com/claudiodangelis/banco/module"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -16,6 +16,9 @@ var rootCmd = &cobra.Command{
 	Short: "Launch banco",
 	Long:  "Launch banco",
 	Run: func(cmd *cobra.Command, args []string) {
+        if ok, _ := isBanco(); !ok {
+            log.Fatalln("This is not a banco directory")
+        }
 		util.ClearScreen()
 		// Show summaries
 		modules := make(map[string]module.Module)

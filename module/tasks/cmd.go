@@ -36,7 +36,6 @@ func (b Module) CmdNew() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			// TODO: Validate inputs
 			// TODO: Implement inputs
-			t := New()
 			var task Task
 			pTitle := promptui.Prompt{
 				Label: "Title",
@@ -46,9 +45,13 @@ func (b Module) CmdNew() *cobra.Command {
 				panic(err)
 			}
 			task.Title = title
+			statuses, err := statuses()
+			if err != nil {
+				panic(err)
+			}
 			pStatus := promptui.Select{
 				Label: "Status",
-				Items: t.statuses,
+				Items: statuses,
 			}
 			_, status, err := pStatus.Run()
 			if err != nil {
@@ -67,6 +70,9 @@ func (b Module) CmdNew() *cobra.Command {
 				task.IsDir = true
 			}
 			if err := create(task); err != nil {
+				panic(err)
+			}
+			if err := open(task); err != nil {
 				panic(err)
 			}
 		},
