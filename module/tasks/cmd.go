@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"github.com/manifoldco/promptui"
+	"github.com/otiai10/copy"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +25,53 @@ func (b Module) CmdRoot() *cobra.Command {
 
 // CmdUpdate updates a task
 func (b Module) CmdUpdate() *cobra.Command {
-	return &cobra.Command{}
+	return &cobra.Command{
+		Use:   "task",
+		Short: "updates a task",
+		Long:  "updates a task",
+		Run: func(cmd *cobra.Command, args []string) {
+			var newTask Task
+			task, err := taskPicker()
+			if err != nil {
+				panic(err)
+			}
+			newTask = task
+			prompt := promptui.Select{
+				Label: "What you want to do?",
+				Items: []string{"rename", "change status", "convert to dir"},
+			}
+			_, result, err := prompt.Run()
+			if err != nil {
+				panic(err)
+			}
+			if result == "rename" {
+				panic("not implemented yet")
+			} else if result == "change status" {
+				// Prompt the new status
+				allstatuses, err := statuses()
+				if err != nil {
+					panic(err)
+				}
+				promptStatus := promptui.Select{
+					Label: "Set the new status",
+					Items: allstatuses,
+				}
+				_, status, err := promptStatus.Run()
+				if err != nil {
+					panic(err)
+				}
+				newTask.Status = status
+			}
+			// Duplicate the task
+			if err := copy.Copy(task.Path(), newTask.Path()); err != nil {
+				panic(err)
+			}
+			// Delete old task
+			if err := delete(task); err != nil {
+				panic(err)
+			}
+		},
+	}
 }
 
 // CmdNew creates a new task
