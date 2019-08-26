@@ -2,19 +2,11 @@ package util
 
 import (
 	"io/ioutil"
+
 	"github.com/buger/goterm"
 	"github.com/manifoldco/promptui"
 )
-// IsBanco checks if the current directory is a banco directory
-//func IsBanco() (bool, error) {
-//    for _, m := range module.All() {
-//        if _, err := m.Check(); err != nil {
-//            return false, err
-//        }
-//    }
-//    return true, nil
-//}
-//
+
 // ClearScreen clears the screen
 func ClearScreen() {
 	// TODO: This will go away when we have a proper gui
