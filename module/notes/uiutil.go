@@ -7,6 +7,21 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
+// Shows a select-with-add prompt to choose the label or add a new one
+func labelPicker() (string, error) {
+	l, err := labels()
+	if err != nil {
+		return "", err
+	}
+	prompt := promptui.SelectWithAdd{
+		AddLabel: "Create label",
+		Items:    l,
+		Label:    "Choose label",
+	}
+	_, result, err := prompt.Run()
+	return result, err
+}
+
 // Shows a select prompt to choose the note
 func notePicker() (Note, error) {
 	items := []string{}

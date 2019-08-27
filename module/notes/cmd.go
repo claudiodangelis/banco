@@ -3,7 +3,6 @@ package notes
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/claudiodangelis/banco/util"
 	"github.com/manifoldco/promptui"
@@ -193,27 +192,13 @@ func (b Module) CmdNew() *cobra.Command {
 		Short: "creates new note",
 		Long:  "creates new note",
 		Run: func(cmd *cobra.Command, args []string) {
-			// TODO: It should always be interactive
-			// Check if the `--interactive` flag is passed
-			if interactive {
-				label, title = "", ""
+			title, err := util.AskInput("Title")
+			if err != nil {
+				log.Fatalln(err)
 			}
-			// TODO: Not quite sure this is the right place to put this
-			// TODO: Document this "feature"
-			label = strings.TrimPrefix(label, "notes/")
-			if title == "" {
-				result, err := util.AskInput("Title")
-				if err != nil {
-					log.Fatalln(err)
-				}
-				title = result
-			}
-			if interactive {
-				result, err := util.AskInput("Label (subfolder)")
-				if err != nil {
-					log.Fatalln(err)
-				}
-				label = result
+			label, err := labelPicker()
+			if err != nil {
+				log.Fatalln(err)
 			}
 			// Validate label
 			if _, err := validateLabel(label); err != nil {

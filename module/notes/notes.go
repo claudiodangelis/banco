@@ -122,6 +122,23 @@ func rename(current, next Note) error {
 	return nil
 }
 
+// labels returns a list of labels
+func labels() ([]string, error) {
+	notes, err := list()
+	if err != nil {
+		return []string{}, err
+	}
+	m := make(map[string]bool)
+	for _, note := range notes {
+		m[note.Label] = true
+	}
+	l := []string{}
+	for label := range m {
+		l = append(l, label)
+	}
+	return l, nil
+}
+
 // Return a list of notes
 func list() ([]Note, error) {
 	var notes []Note
