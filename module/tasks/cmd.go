@@ -139,5 +139,18 @@ func (b Module) CmdDelete() *cobra.Command {
 
 // CmdOpen open a task
 func (b Module) CmdOpen() *cobra.Command {
-	return &cobra.Command{}
+	return &cobra.Command{
+		Use:   "task",
+		Short: "Open a task",
+		Long:  "Open a task",
+		Run: func(cmd *cobra.Command, args []string) {
+			task, err := taskPicker()
+			if err != nil {
+				panic(err)
+			}
+			if err := open(task); err != nil {
+				panic(err)
+			}
+		},
+	}
 }
