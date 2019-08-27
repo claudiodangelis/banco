@@ -20,7 +20,20 @@ func (b Module) CmdSummary() *cobra.Command {
 
 // CmdRoot sets the root for this command (interactive searching note)
 func (b Module) CmdRoot() *cobra.Command {
-	return &cobra.Command{}
+	return &cobra.Command{
+		Use:   "tasks",
+		Short: "Manage tasks",
+		Long:  "Manage tasks",
+		Run: func(cmd *cobra.Command, args []string) {
+			task, err := taskPicker()
+			if err != nil {
+				panic(err)
+			}
+			if err := open(task); err != nil {
+				panic(err)
+			}
+		},
+	}
 }
 
 // CmdUpdate updates a task

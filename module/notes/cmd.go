@@ -37,7 +37,9 @@ func (b Module) CmdRoot() *cobra.Command {
 			if err != nil {
 				panic(err)
 			}
-			open(note)
+			if err := open(note); err != nil {
+				panic(err)
+			}
 		},
 	}
 	return cmd
