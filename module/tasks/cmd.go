@@ -13,7 +13,6 @@ func (b Module) CmdSummary() *cobra.Command {
 		Short: "Summary",
 		Long:  "Summary",
 		Run: func(cmd *cobra.Command, args []string) {
-
 		},
 	}
 }
@@ -147,7 +146,20 @@ func (b Module) CmdList() *cobra.Command {
 
 // CmdDelete deletes a task
 func (b Module) CmdDelete() *cobra.Command {
-	return &cobra.Command{}
+	return &cobra.Command{
+		Use:   "task",
+		Short: "Deletes a task",
+		Long:  "Deletes a task",
+		Run: func(cmd *cobra.Command, args []string) {
+			task, err := taskPicker()
+			if err != nil {
+				panic(err)
+			}
+			if err := delete(task); err != nil {
+				panic(err)
+			}
+		},
+	}
 }
 
 // CmdOpen open a task
