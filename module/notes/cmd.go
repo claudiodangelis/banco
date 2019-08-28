@@ -17,7 +17,7 @@ func (b Module) CmdSummary() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			s, err := summary()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			fmt.Println(s)
 		},
@@ -34,10 +34,10 @@ func (b Module) CmdRoot() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			note, err := notePicker()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if err := open(note); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 		},
 	}
@@ -54,7 +54,7 @@ func (b Module) CmdUpdate() *cobra.Command {
 			// Prompt which note you want to update
 			note, err := notePicker()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			// Prompt what kind of update you want to make
 			prompt := promptui.Select{
@@ -63,7 +63,7 @@ func (b Module) CmdUpdate() *cobra.Command {
 			}
 			_, result, err := prompt.Run()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if result == "rename" {
 				// Prompt new title
@@ -74,7 +74,7 @@ func (b Module) CmdUpdate() *cobra.Command {
 				}
 				title, err := pTitle.Run()
 				if err != nil {
-					panic(err)
+					log.Fatalln(err)
 				}
 				// Prompt new label
 				pLabel := promptui.Prompt{
@@ -84,14 +84,14 @@ func (b Module) CmdUpdate() *cobra.Command {
 				}
 				label, err := pLabel.Run()
 				if err != nil {
-					panic(err)
+					log.Fatalln(err)
 				}
 				newNote := Note{
 					Title: title,
 					Label: label,
 				}
 				if err := rename(note, newNote); err != nil {
-					panic(err)
+					log.Fatalln(err)
 				}
 			}
 		},
@@ -108,7 +108,7 @@ func (b Module) CmdList() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			notes, err := list()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			mapped := make(map[string][]Note)
 			for _, note := range notes {
@@ -152,7 +152,7 @@ func (b Module) CmdDelete() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			note, err := notePicker()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if err := delete(note); err != nil {
 				log.Fatalln(err)
@@ -171,10 +171,10 @@ func (b Module) CmdOpen() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			note, err := notePicker()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if err := open(note); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 		},
 	}

@@ -1,6 +1,8 @@
 package tasks
 
 import (
+	"log"
+
 	"github.com/manifoldco/promptui"
 	"github.com/otiai10/copy"
 	"github.com/spf13/cobra"
@@ -26,10 +28,10 @@ func (b Module) CmdRoot() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			task, err := taskPicker()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if err := open(task); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 		},
 	}
@@ -45,7 +47,7 @@ func (b Module) CmdUpdate() *cobra.Command {
 			var newTask Task
 			task, err := taskPicker()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			newTask = task
 			prompt := promptui.Select{
@@ -54,15 +56,15 @@ func (b Module) CmdUpdate() *cobra.Command {
 			}
 			_, result, err := prompt.Run()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if result == "rename" {
-				panic("not implemented yet")
+				log.Fatalln("not implemented yet")
 			} else if result == "change status" {
 				// Prompt the new status
 				allstatuses, err := statuses()
 				if err != nil {
-					panic(err)
+					log.Fatalln(err)
 				}
 				promptStatus := promptui.Select{
 					Label: "Set the new status",
@@ -70,17 +72,17 @@ func (b Module) CmdUpdate() *cobra.Command {
 				}
 				_, status, err := promptStatus.Run()
 				if err != nil {
-					panic(err)
+					log.Fatalln(err)
 				}
 				newTask.Status = status
 			}
 			// Duplicate the task
 			if err := copy.Copy(task.Path(), newTask.Path()); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			// Delete old task
 			if err := delete(task); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 		},
 	}
@@ -101,12 +103,12 @@ func (b Module) CmdNew() *cobra.Command {
 			}
 			title, err := pTitle.Run()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			task.Title = title
 			statuses, err := statuses()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			pStatus := promptui.Select{
 				Label: "Status",
@@ -114,7 +116,7 @@ func (b Module) CmdNew() *cobra.Command {
 			}
 			_, status, err := pStatus.Run()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			task.Status = status
 			pIsDir := promptui.Select{
@@ -123,16 +125,16 @@ func (b Module) CmdNew() *cobra.Command {
 			}
 			_, isDir, err := pIsDir.Run()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if isDir == "Yes" {
 				task.IsDir = true
 			}
 			if err := create(task); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if err := open(task); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 		},
 	}
@@ -153,10 +155,10 @@ func (b Module) CmdDelete() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			task, err := taskPicker()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if err := delete(task); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 		},
 	}
@@ -171,10 +173,10 @@ func (b Module) CmdOpen() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			task, err := taskPicker()
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 			if err := open(task); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 		},
 	}

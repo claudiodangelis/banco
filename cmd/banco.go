@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
-    "log"
 
-    "github.com/claudiodangelis/banco/util"
 	"github.com/claudiodangelis/banco/module"
+	"github.com/claudiodangelis/banco/util"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 )
@@ -16,9 +16,9 @@ var rootCmd = &cobra.Command{
 	Short: "Launch banco",
 	Long:  "Launch banco",
 	Run: func(cmd *cobra.Command, args []string) {
-        if ok, _ := isBanco(); !ok {
-            log.Fatalln("This is not a banco directory")
-        }
+		if ok, _ := isBanco(); !ok {
+			log.Fatalln("This is not a banco directory")
+		}
 		util.ClearScreen()
 		// Show summaries
 		modules := make(map[string]module.Module)
@@ -27,7 +27,7 @@ var rootCmd = &cobra.Command{
 			modules[m.Name()] = m
 			modulesSlice = append(modulesSlice, m.Name())
 			if err := m.CmdSummary().Execute(); err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
 		}
 		// Prompt modules
@@ -37,7 +37,7 @@ var rootCmd = &cobra.Command{
 		}
 		_, result, err := prompt.Run()
 		if err != nil {
-			panic(err)
+			log.Fatalln(err)
 		}
 		util.ClearScreen()
 		modules[result].CmdRoot().Execute()

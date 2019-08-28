@@ -19,7 +19,7 @@ var initCmd = &cobra.Command{
 		// Check if the current directory is empty
 		dir, err := os.Getwd()
 		if err != nil {
-			panic(err)
+			log.Fatalln(err)
 		}
 		dirempty, err := util.IsEmptyDir(dir)
 		if dirempty == false {
