@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/manifoldco/promptui"
@@ -143,7 +144,21 @@ func (b Module) CmdNew() *cobra.Command {
 
 // CmdList lists tasks
 func (b Module) CmdList() *cobra.Command {
-	return &cobra.Command{}
+	return &cobra.Command{
+		Use:   "tasks",
+		Short: "List tasks",
+		Long:  "List tasks",
+		Run: func(cmd *cobra.Command, args []string) {
+			tasks, err := list()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			for _, task := range tasks {
+				// TODO: Differentiate dirs/non-dirs
+				fmt.Printf("[%s] %s\n", task.Status, task.Title)
+			}
+		},
+	}
 }
 
 // CmdDelete deletes a task
