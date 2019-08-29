@@ -26,7 +26,7 @@ func (b Module) CmdRoot() *cobra.Command {
 		Short: "Manage tasks",
 		Long:  "Manage tasks",
 		Run: func(cmd *cobra.Command, args []string) {
-			task, err := taskPicker()
+			task, err := pick()
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -45,7 +45,7 @@ func (b Module) CmdUpdate() *cobra.Command {
 		Long:  "updates a task",
 		Run: func(cmd *cobra.Command, args []string) {
 			var newTask Task
-			task, err := taskPicker()
+			task, err := pick()
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -153,7 +153,7 @@ func (b Module) CmdDelete() *cobra.Command {
 		Short: "Deletes a task",
 		Long:  "Deletes a task",
 		Run: func(cmd *cobra.Command, args []string) {
-			task, err := taskPicker()
+			task, err := pick()
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -171,7 +171,7 @@ func (b Module) CmdOpen() *cobra.Command {
 		Short: "Open a task",
 		Long:  "Open a task",
 		Run: func(cmd *cobra.Command, args []string) {
-			task, err := taskPicker()
+			task, err := pick()
 			if err != nil {
 				log.Fatalln(err)
 			}

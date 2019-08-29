@@ -59,7 +59,7 @@ func (b Module) Check() error {
 }
 
 // TODO: Move this function to tasks/util.go
-func taskPicker() (Task, error) {
+func pick() (Task, error) {
 	// TODO: Lots of duplicate code here, investigate if there is a solution
 	var items []string
 	tasks, err := list()

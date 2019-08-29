@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/claudiodangelis/banco/module"
 	"github.com/claudiodangelis/banco/util"
@@ -67,7 +65,6 @@ func init() {
 // Execute the root command
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatalln(err)
 	}
 }

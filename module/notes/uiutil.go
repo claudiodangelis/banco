@@ -23,7 +23,7 @@ func labelPicker() (string, error) {
 }
 
 // Shows a select prompt to choose the note
-func notePicker() (Note, error) {
+func pick() (Note, error) {
 	items := []string{}
 	notes, err := list()
 	if err != nil {

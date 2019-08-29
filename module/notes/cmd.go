@@ -32,7 +32,7 @@ func (b Module) CmdRoot() *cobra.Command {
 		Short: "manage notes",
 		Long:  "manage notes",
 		Run: func(cmd *cobra.Command, args []string) {
-			note, err := notePicker()
+			note, err := pick()
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -52,7 +52,7 @@ func (b Module) CmdUpdate() *cobra.Command {
 		Long:  "updates a note",
 		Run: func(cmd *cobra.Command, args []string) {
 			// Prompt which note you want to update
-			note, err := notePicker()
+			note, err := pick()
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -150,7 +150,7 @@ func (b Module) CmdDelete() *cobra.Command {
 		Short: "deletes a note",
 		Long:  "Deletes a note. If the note has a label and it's the only note with that label, label is deleted",
 		Run: func(cmd *cobra.Command, args []string) {
-			note, err := notePicker()
+			note, err := pick()
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -169,7 +169,7 @@ func (b Module) CmdOpen() *cobra.Command {
 		Short: "open a note",
 		Long:  "open a note",
 		Run: func(cmd *cobra.Command, args []string) {
-			note, err := notePicker()
+			note, err := pick()
 			if err != nil {
 				log.Fatalln(err)
 			}
