@@ -32,12 +32,26 @@ func (b Module) CmdRoot() *cobra.Command {
 		Short: "manage notes",
 		Long:  "manage notes",
 		Run: func(cmd *cobra.Command, args []string) {
-			note, err := pick()
+			util.ClearScreen()
+			// TODO: Explore if this can be abstracted
+			p := promptui.Select{
+				Items: []string{
+					"Create a note",
+					"Open a note",
+					"Update a note",
+				},
+				Label: "What you want to do?",
+			}
+			_, result, err := p.Run()
 			if err != nil {
 				log.Fatalln(err)
 			}
-			if err := open(note); err != nil {
-				log.Fatalln(err)
+			if result == "Create a note" {
+				b.CmdNew().Execute()
+			} else if result == "Open a note" {
+				b.CmdOpen().Execute()
+			} else if result == "Update a note" {
+				b.CmdUpdate().Execute()
 			}
 		},
 	}

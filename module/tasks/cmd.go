@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/claudiodangelis/banco/util"
 	"github.com/manifoldco/promptui"
 	"github.com/otiai10/copy"
 	"github.com/spf13/cobra"
@@ -27,12 +28,26 @@ func (b Module) CmdRoot() *cobra.Command {
 		Short: "Manage tasks",
 		Long:  "Manage tasks",
 		Run: func(cmd *cobra.Command, args []string) {
-			task, err := pick()
+			util.ClearScreen()
+			// TODO: Explore if this can be abstracted
+			p := promptui.Select{
+				Items: []string{
+					"Create a task",
+					"Open a task",
+					"Update a task",
+				},
+				Label: "What you want to do?",
+			}
+			_, result, err := p.Run()
 			if err != nil {
 				log.Fatalln(err)
 			}
-			if err := open(task); err != nil {
-				log.Fatalln(err)
+			if result == "Create a task" {
+				b.CmdNew().Execute()
+			} else if result == "Open a task" {
+				b.CmdOpen().Execute()
+			} else if result == "Update a task" {
+				b.CmdUpdate().Execute()
 			}
 		},
 	}
