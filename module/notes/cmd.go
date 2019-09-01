@@ -9,6 +9,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Entrypoint of the module
+func (b Module) Entrypoint() error {
+	// TODO: Explore if this can be abstracted
+	p := promptui.Select{
+		Items: []string{
+			"Create a note",
+			"Open a note",
+			"Update a note",
+		},
+		Label: "What you want to do?",
+	}
+	_, result, err := p.Run()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if result == "Create a note" {
+		b.CmdNew().Execute()
+	} else if result == "Open a note" {
+		b.CmdOpen().Execute()
+	} else if result == "Update a note" {
+		b.CmdUpdate().Execute()
+	}
+	return nil
+}
+
 // CmdSummary returns a single line summary of the module's items
 func (b Module) CmdSummary() *cobra.Command {
 	cmd := &cobra.Command{
@@ -33,25 +58,8 @@ func (b Module) CmdRoot() *cobra.Command {
 		Long:  "manage notes",
 		Run: func(cmd *cobra.Command, args []string) {
 			util.ClearScreen()
-			// TODO: Explore if this can be abstracted
-			p := promptui.Select{
-				Items: []string{
-					"Create a note",
-					"Open a note",
-					"Update a note",
-				},
-				Label: "What you want to do?",
-			}
-			_, result, err := p.Run()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			if result == "Create a note" {
-				b.CmdNew().Execute()
-			} else if result == "Open a note" {
-				b.CmdOpen().Execute()
-			} else if result == "Update a note" {
-				b.CmdUpdate().Execute()
+			if err := b.Entrypoint(); err != nil {
+				panic(err)
 			}
 		},
 	}

@@ -10,6 +10,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Entrypoint of the module
+func (b Module) Entrypoint() error {
+	// TODO: Explore if this can be abstracted
+	p := promptui.Select{
+		Items: []string{
+			"Create a task",
+			"Open a task",
+			"Update a task",
+		},
+		Label: "What you want to do?",
+	}
+	_, result, err := p.Run()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if result == "Create a task" {
+		b.CmdNew().Execute()
+	} else if result == "Open a task" {
+		b.CmdOpen().Execute()
+	} else if result == "Update a task" {
+		b.CmdUpdate().Execute()
+	}
+	return nil
+}
+
 // CmdSummary returns a single line summary of the module's items
 func (b Module) CmdSummary() *cobra.Command {
 	return &cobra.Command{
@@ -29,25 +54,8 @@ func (b Module) CmdRoot() *cobra.Command {
 		Long:  "Manage tasks",
 		Run: func(cmd *cobra.Command, args []string) {
 			util.ClearScreen()
-			// TODO: Explore if this can be abstracted
-			p := promptui.Select{
-				Items: []string{
-					"Create a task",
-					"Open a task",
-					"Update a task",
-				},
-				Label: "What you want to do?",
-			}
-			_, result, err := p.Run()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			if result == "Create a task" {
-				b.CmdNew().Execute()
-			} else if result == "Open a task" {
-				b.CmdOpen().Execute()
-			} else if result == "Update a task" {
-				b.CmdUpdate().Execute()
+			if err := b.Entrypoint(); err != nil {
+				panic(err)
 			}
 		},
 	}

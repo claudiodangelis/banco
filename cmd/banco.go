@@ -17,7 +17,6 @@ var rootCmd = &cobra.Command{
 		if ok, _ := isBanco(); !ok {
 			log.Fatalln("This is not a banco directory")
 		}
-		util.ClearScreen()
 		// Show summaries
 		modules := make(map[string]module.Module)
 		modulesSlice := []string{}
@@ -28,17 +27,22 @@ var rootCmd = &cobra.Command{
 				log.Fatalln(err)
 			}
 		}
-		// Prompt modules
-		prompt := promptui.Select{
-			Label: "Modules",
-			Items: modulesSlice,
+		// Loop entrypoint
+		for {
+			util.ClearScreen()
+			// Prompt modules
+			prompt := promptui.Select{
+				Label: "Modules",
+				Items: modulesSlice,
+			}
+			_, result, err := prompt.Run()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			util.ClearScreen()
+
+			modules[result].Entrypoint()
 		}
-		_, result, err := prompt.Run()
-		if err != nil {
-			log.Fatalln(err)
-		}
-		util.ClearScreen()
-		modules[result].CmdRoot().Execute()
 	},
 }
 

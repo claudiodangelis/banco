@@ -18,6 +18,7 @@ type Module interface {
 	Name() string
 	Init() error
 	Check() error
+	Entrypoint() error
 }
 
 // All modules
