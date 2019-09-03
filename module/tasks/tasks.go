@@ -185,6 +185,8 @@ func delete(task Task) error {
 		return nil
 	}
 	// Recursively check if label and its parents are empty, if so, delete them
+    // FIXME: There is a bug here. If it's the only task for that status,
+    // status directory is deleted as well. 
 	dir := filepath.Dir(task.Path())
 	for {
 		if err := os.Remove(dir); err != nil {
