@@ -172,31 +172,8 @@ func delete(task Task) error {
 		return errors.New("task does not exist")
 	}
 	// Delete the task if it exists
-	if err := os.Remove(task.Path()); err != nil {
+	if err := os.RemoveAll(task.Path()); err != nil {
 		return err
-	}
-	// If directory is empty, delete directory
-	contents, err := ioutil.ReadDir(filepath.Dir(task.Path()))
-	if err != nil {
-		return err
-	}
-	if len(contents) > 0 {
-		// Directory is not empty
-		return nil
-	}
-	// Recursively check if label and its parents are empty, if so, delete them
-    // FIXME: There is a bug here. If it's the only task for that status,
-    // status directory is deleted as well. 
-	dir := filepath.Dir(task.Path())
-	for {
-		if err := os.Remove(dir); err != nil {
-			// TODO: this is not the strongest option
-			return nil
-		}
-		dir = filepath.Dir(dir)
-		if dir == "tasks" {
-			break
-		}
 	}
 	return nil
 }
