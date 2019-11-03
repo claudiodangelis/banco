@@ -48,6 +48,7 @@ func (n Notes) Init() error {
 
 // UpdateItemParameters when updating a note
 func (n Notes) UpdateItemParameters() []item.Parameter {
+	// TODO: This should set default values
 	return n.NewItemParameters()
 }
 

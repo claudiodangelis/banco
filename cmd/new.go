@@ -29,6 +29,12 @@ func create(m module.Module) error {
 				return err
 			}
 			result = output
+		} else if input.InputType == "select" {
+			output, err := ui.Select(input.Name, input.Options, false)
+			if err != nil {
+				return err
+			}
+			result = output
 		}
 		item[input.Name] = result
 	}

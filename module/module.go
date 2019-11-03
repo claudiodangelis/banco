@@ -3,6 +3,7 @@ package module
 import (
 	"github.com/claudiodangelis/banco/item"
 	"github.com/claudiodangelis/banco/module/notes"
+	"github.com/claudiodangelis/banco/module/tasks"
 )
 
 // Module for banco
@@ -33,6 +34,7 @@ type Module interface {
 func All() []Module {
 	return []Module{
 		notes.Module(),
+		tasks.Module(),
 	}
 }
 
