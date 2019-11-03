@@ -30,4 +30,4 @@ banco notes
 
 Banco is created by Claudio d'Angelis.
 
-The name "Banco" is a tribute Banco Del Mutuo Soccorso, the best italian progressive rock band of all times.
+The name "Banco" is a tribute to Banco Del Mutuo Soccorso, the best italian progressive rock band of all times.
