@@ -17,6 +17,7 @@ func init() {
 	// Append sub commands
 	for _, module := range module.All() {
 		// List commands
+		fmt.Println("appending sub command for", module.Name())
 		listCmd.AddCommand(&cobra.Command{
 			Use:   module.Name(),
 			Short: fmt.Sprintf("List %s", module.Name()),
@@ -124,16 +125,18 @@ func chooseItem(module module.Module) (item.Item, error) {
 // chooseModule is an utility function that prompts
 // a list of available modules
 func chooseModule() (module.Module, error) {
-	modules := module.Map()
+	modules := module.All()
+	dict := make(map[string]module.Module)
 	names := make([]string, 0, len(modules))
-	for k := range modules {
-		names = append(names, k)
+	for _, module := range modules {
+		dict[module.Name()] = module
+		names = append(names, module.Name())
 	}
 	choice, err := ui.Select("Choose module", names, false)
 	if err != nil {
 		return nil, err
 	}
-	return modules[choice], nil
+	return dict[choice], nil
 }
 
 func root(module module.Module) error {

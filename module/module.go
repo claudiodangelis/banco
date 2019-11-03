@@ -37,12 +37,3 @@ func All() []Module {
 		tasks.Module(),
 	}
 }
-
-// Map module name to module struct
-func Map() map[string]Module {
-	m := make(map[string]Module)
-	for _, module := range All() {
-		m[module.Name()] = module
-	}
-	return m
-}
