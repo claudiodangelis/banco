@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/buger/goterm"
@@ -12,16 +11,13 @@ import (
 // value in the list
 func initialPosition(options []string, value string) int {
 	if value == "" {
-		fmt.Println("no default")
 		return 0
 	}
 	for position, item := range options {
 		if value == item {
-			fmt.Println("found the default in", item, "returning", position)
 			return position
 		}
 	}
-	fmt.Println("no default found among items")
 	return 0
 }
 
