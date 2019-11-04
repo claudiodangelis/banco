@@ -98,16 +98,13 @@ func init() {
 }
 
 // chooseItem is an utility function that prompts a list of available
-// items
+// items for the given module
 func chooseItem(module module.Module) (item.Item, error) {
-	// Pick item
-	// TODO: Lots of duplicate code here, refactor
 	items, err := module.List()
 	if err != nil {
 		return item.Item{}, err
 	}
 	// Create a map of items
-	// TODO: Research improvement
 	itemsDict := make(map[string]item.Item)
 	names := []string{}
 	for _, item := range items {
@@ -146,20 +143,17 @@ func root(module module.Module) error {
 		return err
 	}
 	// List what you want to do with the item
-	// TODO: Use enums
-	actions := []string{
-		"Open", "Update", "Delete",
-	}
-	action, err := ui.Select("What you want to do?", actions, false)
+	action, err := ui.Select("What you want to do?", ui.ActionsAll, false)
 	if err != nil {
 		return err
 	}
-	if action == "Open" {
+	switch action {
+	case ui.ActionOpen:
 		return open(module, item)
-	} else if action == "Delete" {
-		return delete(module, item)
-	} else if action == "Update" {
+	case ui.ActionUpdate:
 		return update(module, item)
+	case ui.ActionDelete:
+		return delete(module, item)
 	}
 	return errors.New("invalid choice")
 }
