@@ -15,7 +15,8 @@ import (
 func init() {
 	rootCmd.AddCommand(initCmd)
 	// Append sub commands
-	for _, module := range module.All() {
+	for _, m := range module.All() {
+		module := m
 		// List commands
 		fmt.Println("appending sub command for", module.Name())
 		listCmd.AddCommand(&cobra.Command{
