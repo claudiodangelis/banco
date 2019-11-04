@@ -14,7 +14,6 @@ func update(module module.Module, current item.Item) error {
 	// Ask for properties
 	next := make(item.Item)
 	for _, input := range module.UpdateItemParameters() {
-		// TODO: Replace with enums
 		var result string
 		if input.InputType == ui.InputText {
 			output, err := ui.Input(input.Name, input.Default)
