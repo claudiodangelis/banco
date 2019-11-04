@@ -18,7 +18,6 @@ func init() {
 	for _, m := range module.All() {
 		module := m
 		// List commands
-		fmt.Println("appending sub command for", module.Name())
 		listCmd.AddCommand(&cobra.Command{
 			Use:   module.Name(),
 			Short: fmt.Sprintf("List %s", module.Name()),

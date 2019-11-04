@@ -4,15 +4,16 @@ import (
 	"strings"
 
 	"github.com/buger/goterm"
+
 	"github.com/manifoldco/promptui"
 )
 
 // ClearScreen clears the screen
 func ClearScreen() {
 	// TODO: This will go away when we have a proper gui
-	goterm.Clear()
-	goterm.MoveCursor(1, 1)
-	goterm.Flush()
+	// goterm.Clear()
+	// goterm.MoveCursor(1, 1)
+	// goterm.Flush()
 }
 
 // Select one of the items
@@ -25,6 +26,7 @@ func Select(label string, items []string, search bool) (string, error) {
 		Searcher: func(input string, index int) bool {
 			return strings.Contains(items[index], input)
 		},
+		Size: goterm.Height() - 3,
 	}
 	_, result, err := prompt.Run()
 	return result, err
@@ -58,6 +60,7 @@ func SelectWithAdd(label, value string, options []string) (string, error) {
 			typed = input
 			return strings.Contains(options[index], input)
 		},
+		Size: goterm.Height() - 3,
 	}
 	i, result, err := prompt.Run()
 	if err != nil {
