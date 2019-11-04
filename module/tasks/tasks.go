@@ -135,9 +135,14 @@ func statuses() ([]string, error) {
 	return statuses, nil
 }
 
-// UpdateItemParameters to be input when updating a new item
-func (t Tasks) UpdateItemParameters() []item.Parameter {
-	return t.NewItemParameters()
+// UpdateItemParameters when updating a note
+func (t Tasks) UpdateItemParameters(current item.Item) []item.Parameter {
+	parameters := []item.Parameter{}
+	for _, parameter := range t.NewItemParameters() {
+		parameter.Default = current[parameter.Name]
+		parameters = append(parameters, parameter)
+	}
+	return parameters
 }
 
 // NewItemParameters to be input when creating an item

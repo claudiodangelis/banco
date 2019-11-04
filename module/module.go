@@ -15,7 +15,7 @@ type Module interface {
 	// NewItemParameters to be input when creating a new item
 	NewItemParameters() []item.Parameter
 	// UpdateItemParameters to be input when updating an item
-	UpdateItemParameters() []item.Parameter
+	UpdateItemParameters(item.Item) []item.Parameter
 	// SaveItem stores a new item
 	SaveItem(item.Item) error
 	// OpenItem opens the item

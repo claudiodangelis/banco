@@ -111,7 +111,7 @@ func chooseItem(module module.Module) (item.Item, error) {
 		names = append(names, item.Name())
 	}
 	// Prompt list of items
-	result, err := ui.Select(fmt.Sprintf("Choose a %s", module.Singular()), names, true)
+	result, err := ui.Select(fmt.Sprintf("Choose a %s", module.Singular()), names, "", true)
 	if err != nil {
 		return item.Item{}, err
 	}
@@ -129,7 +129,7 @@ func chooseModule() (module.Module, error) {
 		dict[module.Name()] = module
 		names = append(names, module.Name())
 	}
-	choice, err := ui.Select("Choose module", names, false)
+	choice, err := ui.Select("Choose module", names, "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func root(module module.Module) error {
 		return err
 	}
 	// List what you want to do with the item
-	action, err := ui.Select("What you want to do?", ui.ActionsAll, false)
+	action, err := ui.Select("What you want to do?", ui.ActionsAll, "", false)
 	if err != nil {
 		return err
 	}

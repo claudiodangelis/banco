@@ -49,9 +49,13 @@ func (n Notes) Init() error {
 }
 
 // UpdateItemParameters when updating a note
-func (n Notes) UpdateItemParameters() []item.Parameter {
-	// TODO: This should set default values
-	return n.NewItemParameters()
+func (n Notes) UpdateItemParameters(current item.Item) []item.Parameter {
+	parameters := []item.Parameter{}
+	for _, parameter := range n.NewItemParameters() {
+		parameter.Default = current[parameter.Name]
+		parameters = append(parameters, parameter)
+	}
+	return parameters
 }
 
 // NewItemParameters for a new note

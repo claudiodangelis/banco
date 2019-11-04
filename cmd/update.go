@@ -13,7 +13,7 @@ import (
 func update(module module.Module, current item.Item) error {
 	// Ask for properties
 	next := make(item.Item)
-	for _, input := range module.UpdateItemParameters() {
+	for _, input := range module.UpdateItemParameters(current) {
 		var result string
 		if input.InputType == ui.InputText {
 			output, err := ui.Input(input.Name, input.Default)
@@ -22,7 +22,7 @@ func update(module module.Module, current item.Item) error {
 			}
 			result = output
 		} else if input.InputType == ui.InputSelectWithAdd {
-			output, err := ui.SelectWithAdd(input.Name, input.Default, input.Options)
+			output, err := ui.SelectWithAdd(input.Name, input.Default, input.Options, true)
 			if err != nil {
 				return err
 			}

@@ -23,13 +23,13 @@ func create(m module.Module) error {
 			}
 			result = output
 		} else if input.InputType == ui.InputSelectWithAdd {
-			output, err := ui.SelectWithAdd(input.Name, input.Default, input.Options)
+			output, err := ui.SelectWithAdd(input.Name, input.Default, input.Options, true)
 			if err != nil {
 				return err
 			}
 			result = output
 		} else if input.InputType == ui.InputSelect {
-			output, err := ui.Select(input.Name, input.Options, false)
+			output, err := ui.Select(input.Name, input.Options, input.Default, false)
 			if err != nil {
 				return err
 			}

@@ -11,7 +11,7 @@ import (
 
 func delete(module module.Module, item item.Item) error {
 	// Ask if users really want to delete
-	confirm, err := ui.Select("Do you really want to delete this item?", []string{"Yes", "No"}, false)
+	confirm, err := ui.Select("Do you really want to delete this item?", []string{"Yes", "No"}, "No", false)
 	if err != nil {
 		return err
 	}
