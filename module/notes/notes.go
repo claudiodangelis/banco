@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/claudiodangelis/banco/ui"
+
 	"github.com/claudiodangelis/banco/item"
 	"github.com/otiai10/copy"
 )
@@ -62,12 +64,12 @@ func (n Notes) NewItemParameters() []item.Parameter {
 		item.Parameter{
 			Name:      "Title",
 			Default:   "",
-			InputType: "input",
+			InputType: ui.InputText,
 		},
 		item.Parameter{
 			Name:      "Label",
 			Default:   "",
-			InputType: "select-with-add",
+			InputType: ui.InputSelectWithAdd,
 			Options:   labels,
 		},
 	}

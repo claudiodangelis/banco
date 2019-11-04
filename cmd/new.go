@@ -15,21 +15,20 @@ func create(m module.Module) error {
 	// Create empty
 	item := make(item.Item)
 	for _, input := range m.NewItemParameters() {
-		// TODO: Replace with enums
 		var result string
-		if input.InputType == "input" {
+		if input.InputType == ui.InputText {
 			output, err := ui.Input(input.Name, input.Default)
 			if err != nil {
 				return err
 			}
 			result = output
-		} else if input.InputType == "select-with-add" {
+		} else if input.InputType == ui.InputSelectWithAdd {
 			output, err := ui.SelectWithAdd(input.Name, input.Default, input.Options)
 			if err != nil {
 				return err
 			}
 			result = output
-		} else if input.InputType == "select" {
+		} else if input.InputType == ui.InputSelect {
 			output, err := ui.Select(input.Name, input.Options, false)
 			if err != nil {
 				return err

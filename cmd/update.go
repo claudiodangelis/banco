@@ -16,13 +16,13 @@ func update(module module.Module, current item.Item) error {
 	for _, input := range module.UpdateItemParameters() {
 		// TODO: Replace with enums
 		var result string
-		if input.InputType == "input" {
+		if input.InputType == ui.InputText {
 			output, err := ui.Input(input.Name, input.Default)
 			if err != nil {
 				return err
 			}
 			result = output
-		} else if input.InputType == "select-with-add" {
+		} else if input.InputType == ui.InputSelectWithAdd {
 			output, err := ui.SelectWithAdd(input.Name, input.Default, input.Options)
 			if err != nil {
 				return err

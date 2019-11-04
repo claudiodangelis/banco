@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/claudiodangelis/banco/ui"
+
 	"github.com/claudiodangelis/banco/item"
 	"github.com/otiai10/copy"
 )
@@ -118,29 +120,6 @@ func (t Tasks) Singular() string {
 	return "task"
 }
 
-/*
-
-// NewItemParameters for a new note
-func (n Notes) NewItemParameters() []item.Parameter {
-	labels, err := labels()
-	if err != nil {
-		panic(err)
-	}
-	return []item.Parameter{
-		item.Parameter{
-			Name:      "Title",
-			Default:   "",
-			InputType: "input",
-		},
-		item.Parameter{
-			Name:      "Label",
-			Default:   "",
-			InputType: "select-with-add",
-			Options:   labels,
-		},
-	}
-}
-*/
 // statuses get the list of statuses
 func statuses() ([]string, error) {
 	var statuses []string
@@ -170,16 +149,16 @@ func (t Tasks) NewItemParameters() []item.Parameter {
 	return []item.Parameter{
 		item.Parameter{
 			Name:      "Title",
-			InputType: "input",
+			InputType: ui.InputText,
 		},
 		item.Parameter{
 			Name:      "Status",
-			InputType: "select-with-add",
+			InputType: ui.InputSelectWithAdd,
 			Options:   statuses,
 		},
 		item.Parameter{
 			Name:      "Is a directory",
-			InputType: "select",
+			InputType: ui.InputSelect,
 			Options:   []string{"Yes", "No"},
 		},
 	}
