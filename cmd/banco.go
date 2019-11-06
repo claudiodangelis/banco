@@ -42,7 +42,7 @@ func init() {
 			Use:   module.Singular(),
 			Short: fmt.Sprintf("Update a %s", module.Singular()),
 			Run: func(cmd *cobra.Command, args []string) {
-				item, err := chooseItem(module)
+				item, err := chooseItem(module, false)
 				if err != nil {
 					log.Fatalln(err)
 				}
@@ -56,7 +56,7 @@ func init() {
 			Use:   module.Singular(),
 			Short: fmt.Sprintf("Delete a %s", module.Singular()),
 			Run: func(cmd *cobra.Command, args []string) {
-				item, err := chooseItem(module)
+				item, err := chooseItem(module, false)
 				if err != nil {
 					log.Fatalln(err)
 				}
@@ -70,7 +70,7 @@ func init() {
 			Use:   module.Singular(),
 			Short: fmt.Sprintf("Open a %s", module.Singular()),
 			Run: func(cmd *cobra.Command, args []string) {
-				item, err := chooseItem(module)
+				item, err := chooseItem(module, false)
 				if err != nil {
 					log.Fatalln(err)
 				}
@@ -98,7 +98,8 @@ func init() {
 
 // chooseItem is an utility function that prompts a list of available
 // items for the given module
-func chooseItem(module module.Module) (item.Item, error) {
+// TODO: This must be refactored because it's very hard to read
+func chooseItem(module module.Module, withAdd bool) (item.Item, error) {
 	items, err := module.List()
 	if err != nil {
 		return item.Item{}, err
@@ -110,8 +111,12 @@ func chooseItem(module module.Module) (item.Item, error) {
 		itemsDict[item.Name()] = item
 		names = append(names, item.Name())
 	}
+	if withAdd {
+		names = append([]string{"+ Create a new one"}, names...)
+	}
 	// Prompt list of items
-	result, err := ui.Select(fmt.Sprintf("Choose a %s", module.Singular()), names, "", true)
+	result, err := ui.Select(fmt.Sprintf("Choose a %s or create one",
+		module.Singular()), names, "", true)
 	if err != nil {
 		return item.Item{}, err
 	}
@@ -137,9 +142,16 @@ func chooseModule() (module.Module, error) {
 }
 
 func root(module module.Module) error {
-	item, err := chooseItem(module)
+	item, err := chooseItem(module, true)
 	if err != nil {
 		return err
+	}
+	// TODO: This must be refactored because it's impossible to understand
+	// `chooseItem()` returns an blank item if the user chooses to create
+	// a new one. Since an item is a type of map, if len == 0, then item
+	// is empty
+	if len(item) == 0 {
+		return create(module)
 	}
 	// List what you want to do with the item
 	action, err := ui.Select("What you want to do?", ui.ActionsAll, "", false)

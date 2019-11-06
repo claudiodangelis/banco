@@ -42,7 +42,7 @@ var updateCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-		item, err := chooseItem(module)
+		item, err := chooseItem(module, false)
 		if err != nil {
 			log.Fatalln(err)
 		}
