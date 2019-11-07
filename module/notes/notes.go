@@ -3,7 +3,6 @@ package notes
 import (
 	"errors"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,7 +43,10 @@ func (n Notes) Singular() string {
 
 // Init the module
 func (n Notes) Init() error {
-	log.Println("init notes")
+	// Create "notes" directory
+	if err := os.Mkdir("notes", os.ModePerm); err != nil {
+		return err
+	}
 	return nil
 }
 
