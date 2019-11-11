@@ -179,7 +179,11 @@ var rootCmd = &cobra.Command{
 			if err != nil {
 				log.Fatalln(err)
 			}
-			if err := root(module); err != nil {
+			switch err := root(module); err {
+			case ui.ErrInterrupt:
+				ui.ClearScreen()
+				continue
+			default:
 				log.Fatalln(err)
 			}
 		}

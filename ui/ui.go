@@ -7,6 +7,9 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
+// ErrInterrupt is thrown when user presses ctrl+c
+var ErrInterrupt = promptui.ErrInterrupt
+
 // initialPosition is an utility function that returns the position of the default
 // value in the list
 func initialPosition(options []string, value string) int {
