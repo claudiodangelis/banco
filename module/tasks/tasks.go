@@ -165,6 +165,7 @@ func (t Tasks) NewItemParameters() []item.Parameter {
 			Name:      "Is a directory",
 			InputType: ui.InputSelect,
 			Options:   []string{"Yes", "No"},
+            Default: "No",
 		},
 	}
 }
