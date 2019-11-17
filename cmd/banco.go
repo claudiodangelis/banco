@@ -19,8 +19,9 @@ func init() {
 		module := m
 		// List commands
 		listCmd.AddCommand(&cobra.Command{
-			Use:   module.Name(),
-			Short: fmt.Sprintf("List %s", module.Name()),
+			Use:     module.Name(),
+			Aliases: module.Aliases(),
+			Short:   fmt.Sprintf("List %s", module.Name()),
 			Run: func(cmd *cobra.Command, args []string) {
 				if err := list(module); err != nil {
 					log.Fatalln(err)
@@ -29,8 +30,9 @@ func init() {
 		})
 		// New commands
 		newCmd.AddCommand(&cobra.Command{
-			Use:   module.Singular(),
-			Short: fmt.Sprintf("Create a new %s", module.Singular()),
+			Use:     module.Singular(),
+			Aliases: module.Aliases(),
+			Short:   fmt.Sprintf("Create a new %s", module.Singular()),
 			Run: func(cmd *cobra.Command, args []string) {
 				if err := create(module); err != nil {
 					log.Fatalln(err)
@@ -39,8 +41,9 @@ func init() {
 		})
 		// Update commands
 		updateCmd.AddCommand(&cobra.Command{
-			Use:   module.Singular(),
-			Short: fmt.Sprintf("Update a %s", module.Singular()),
+			Use:     module.Singular(),
+			Aliases: module.Aliases(),
+			Short:   fmt.Sprintf("Update a %s", module.Singular()),
 			Run: func(cmd *cobra.Command, args []string) {
 				item, err := chooseItem(module, false)
 				if err != nil {
@@ -53,8 +56,9 @@ func init() {
 		})
 		// Delete commands
 		deleteCmd.AddCommand(&cobra.Command{
-			Use:   module.Singular(),
-			Short: fmt.Sprintf("Delete a %s", module.Singular()),
+			Use:     module.Singular(),
+			Aliases: module.Aliases(),
+			Short:   fmt.Sprintf("Delete a %s", module.Singular()),
 			Run: func(cmd *cobra.Command, args []string) {
 				item, err := chooseItem(module, false)
 				if err != nil {
@@ -67,8 +71,9 @@ func init() {
 		})
 		// Open commands
 		openCmd.AddCommand(&cobra.Command{
-			Use:   module.Singular(),
-			Short: fmt.Sprintf("Open a %s", module.Singular()),
+			Use:     module.Singular(),
+			Aliases: module.Aliases(),
+			Short:   fmt.Sprintf("Open a %s", module.Singular()),
 			Run: func(cmd *cobra.Command, args []string) {
 				item, err := chooseItem(module, false)
 				if err != nil {

@@ -56,7 +56,7 @@ type Document struct {
 
 // Aliases of the module
 func (d Documents) Aliases() []string {
-	return []string{"d", "docs"}
+	return []string{"d", "docs", "doc"}
 }
 
 // Path of the document
