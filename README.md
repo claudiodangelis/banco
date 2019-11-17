@@ -1,15 +1,14 @@
 # Banco
 
-## Note: not usable yet sorry, most of features are not implemented yet
+## Note: it's really basic
 
-Banco Management System, or simply Banco, is an opinionated software for the command line.
+Banco Management System, or simply Banco, is an opinionated project manager for the command line.
 
 Projects consists in a set of things like:
 - documents
 - bookmarks
 - notes
 - tasks
-- repos
 
 Banco creates files and folders. No database, no cloud services, no mobile apps. 
 
