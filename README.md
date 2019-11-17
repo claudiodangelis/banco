@@ -2,28 +2,38 @@
 
 ## Note: it's really basic
 
-Banco Management System, or simply Banco, is an opinionated project manager for the command line.
+Banco Management System, or simply Banco, is an opinionated project management tool for the command line.
 
-Projects consists in a set of things like:
+
+Banco's features are built as modules, there are modules available for management of:
 - documents
 - bookmarks
 - notes
 - tasks
+# Install Banco
 
-Banco creates files and folders. No database, no cloud services, no mobile apps. 
+# Get started
 
+You can check which modules are available by running
+```sh
+banco modules
+```
+
+Initialize a new banco project
+
+Create an empty directory, and run
 ```sh
 banco init
 ```
 
+This command will create folders (and subfolders) for each module.
+For example, the `notes` folder will be created by the "notes" module, the `tasks`, `tasks/backlog`, `tasks/doing`, `tasks/done` folders will be created by the "tasks" module.
 
-```sh
-banco new note
-```
 
-```sh
-banco notes
-```
+
+
+
+
 
 # Credits
 
