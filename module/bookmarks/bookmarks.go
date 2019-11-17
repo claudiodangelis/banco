@@ -28,6 +28,11 @@ type Bookmark struct {
 	Group     string
 }
 
+// Aliases of the module
+func (b Bookmarks) Aliases() []string {
+	return []string{"b", "bm"}
+}
+
 // Path of the bookmark
 func (b Bookmark) Path() string {
 	return filepath.Join("bookmarks", b.Group, b.Title)

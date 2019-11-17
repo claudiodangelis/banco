@@ -12,6 +12,8 @@ import (
 type Module interface {
 	// Name of the module
 	Name() string
+	// Aliases of the module
+	Aliases() []string
 	// Singular name of the module
 	Singular() string
 	// NewItemParameters to be input when creating a new item

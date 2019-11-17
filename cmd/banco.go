@@ -80,8 +80,9 @@ func init() {
 			},
 		})
 		rootCmd.AddCommand(&cobra.Command{
-			Use:   module.Name(),
-			Short: fmt.Sprintf("Show banco for %s", module.Name()),
+			Use:     module.Name(),
+			Aliases: module.Aliases(),
+			Short:   fmt.Sprintf("Show banco for %s", module.Name()),
 			Run: func(cmd *cobra.Command, args []string) {
 				if err := root(module); err != nil {
 					log.Fatalln(err)

@@ -26,6 +26,11 @@ type Note struct {
 	Label     string
 }
 
+// Aliases of the module
+func (n Notes) Aliases() []string {
+	return []string{"n"}
+}
+
 // Path of the note
 func (n Note) Path() string {
 	return filepath.Join("notes", n.Label, n.Title)

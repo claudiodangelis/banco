@@ -54,6 +54,11 @@ type Document struct {
 	filetype  string
 }
 
+// Aliases of the module
+func (d Documents) Aliases() []string {
+	return []string{"d", "docs"}
+}
+
 // Path of the document
 func (d Document) Path() string {
 	return filepath.Join("documents", d.Directory, d.Title)

@@ -30,6 +30,11 @@ type Task struct {
 	Size      int64
 }
 
+// Aliases of the module
+func (t Tasks) Aliases() []string {
+	return []string{"t"}
+}
+
 // Path to the task
 func (t Task) Path() string {
 	return filepath.Join("tasks", t.Status, t.Title)
@@ -165,7 +170,7 @@ func (t Tasks) NewItemParameters() []item.Parameter {
 			Name:      "Is a directory",
 			InputType: ui.InputSelect,
 			Options:   []string{"Yes", "No"},
-            Default: "No",
+			Default:   "No",
 		},
 	}
 }
