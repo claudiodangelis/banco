@@ -16,6 +16,32 @@ import (
 	"github.com/otiai10/copy"
 )
 
+const (
+	filetypePlain    = "plain"
+	filetypeLowriter = "lowriter"
+	filetypeLocalc   = "localc"
+)
+
+// availableTypes is a map of available mime types
+// this map is initialized only when user is creating a new item
+var availableTypes map[string]string
+
+// types return a list of available types
+func types() map[string]string {
+	m := make(map[string]string)
+	m["Plain text"] = filetypePlain
+	// TODO: Implement for other platforms
+	if runtime.GOOS != "linux" {
+		return m
+	}
+	// Check if libreoffice or openoffice are installed
+	if _, err := exec.LookPath("loffice"); err == nil {
+		m["LibreOffice Writer"] = filetypeLowriter
+		m["LibreOffice Calc"] = filetypeLocalc
+	}
+	return m
+}
+
 // Documents is the module
 type Documents struct{}
 
@@ -25,6 +51,7 @@ type Document struct {
 	Size      int64
 	UpdatedAt time.Time
 	Directory string
+	filetype  string
 }
 
 // Path of the document
@@ -55,6 +82,9 @@ func (d Documents) Init() error {
 func (d Documents) UpdateItemParameters(current item.Item) []item.Parameter {
 	parameters := []item.Parameter{}
 	for _, parameter := range d.NewItemParameters() {
+		if parameter.Name == "Type" {
+			continue
+		}
 		parameter.Default = current[parameter.Name]
 		parameters = append(parameters, parameter)
 	}
@@ -63,6 +93,11 @@ func (d Documents) UpdateItemParameters(current item.Item) []item.Parameter {
 
 // NewItemParameters for a new document
 func (d Documents) NewItemParameters() []item.Parameter {
+	availableTypes = types()
+	types := []string{}
+	for t := range availableTypes {
+		types = append(types, t)
+	}
 	allDirs, err := dirs()
 	if err != nil {
 		panic(err)
@@ -78,6 +113,12 @@ func (d Documents) NewItemParameters() []item.Parameter {
 			Default:   "",
 			InputType: ui.InputSelectWithAdd,
 			Options:   allDirs,
+		},
+		item.Parameter{
+			Name:      "Type",
+			Default:   "",
+			InputType: ui.InputSelect,
+			Options:   types,
 		},
 	}
 }
@@ -100,11 +141,47 @@ func save(document Document) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	f, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return err
+	if document.filetype == filetypePlain {
+		f, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+	} else if document.filetype == filetypeLowriter {
+		// Create temporary file in temporary dir
+		tmpdir, err := ioutil.TempDir(os.TempDir(), "banco-")
+		if err != nil {
+			return err
+		}
+		f, err := os.OpenFile(filepath.Join(tmpdir, document.Title), os.O_RDONLY|os.O_CREATE, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		defer os.Remove(tmpdir)
+		// Convert the temporary file using --convert-to odt
+		cmd := exec.Command("loffice", "--headless", "--convert-to", "odt", "--outdir", filepath.Join("documents", document.Directory), filepath.Join(tmpdir, document.Title))
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	} else if document.filetype == filetypeLocalc {
+		// Create temporary file in temporary dir
+		tmpdir, err := ioutil.TempDir(os.TempDir(), "banco-")
+		if err != nil {
+			return err
+		}
+		f, err := os.OpenFile(filepath.Join(tmpdir, document.Title), os.O_RDONLY|os.O_CREATE, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		defer os.Remove(tmpdir)
+		// Convert the temporary file using --convert-to odt
+		cmd := exec.Command("loffice", "--headless", "--convert-to", "ods:calc8", "--outdir", filepath.Join("documents", document.Directory), filepath.Join(tmpdir, document.Title))
+		if err := cmd.Run(); err != nil {
+			return err
+		}
 	}
-	defer f.Close()
 	return nil
 }
 
@@ -241,6 +318,13 @@ func toDocument(i item.Item) Document {
 	document := Document{}
 	document.Title = i["Title"]
 	document.Directory = i["Directory"]
+	document.filetype = availableTypes[i["Type"]]
+	// Append suffix
+	if document.filetype == filetypeLowriter && !strings.HasSuffix(".odt", document.Title) {
+		document.Title = document.Title + ".odt"
+	} else if document.filetype == filetypeLocalc && !strings.HasSuffix(".ods", document.Title) {
+		document.Title = document.Title + ".ods"
+	}
 	return document
 }
 
