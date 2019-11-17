@@ -14,9 +14,11 @@ import (
 
 func init() {
 	rootCmd.AddCommand(initCmd)
+	modules := []string{}
 	// Append sub commands
 	for _, m := range module.All() {
 		module := m
+		modules = append(modules, module.Name())
 		// List commands
 		listCmd.AddCommand(&cobra.Command{
 			Use:     module.Name(),
@@ -95,6 +97,15 @@ func init() {
 			},
 		})
 	}
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "modules",
+		Short: "Show available modules",
+		Run: func(cmd *cobra.Command, args []string) {
+			for _, module := range modules {
+				fmt.Println(module)
+			}
+		},
+	})
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(updateCmd)
