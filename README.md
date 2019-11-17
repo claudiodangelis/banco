@@ -10,7 +10,16 @@ Banco's features are built as modules, there are modules available for managemen
 - bookmarks
 - notes
 - tasks
+
+and, soon, _secrets_.
+
 # Install Banco
+
+Install Banco with go
+
+```sh
+go get github.com/claudiodangelis/banco
+```
 
 # Get started
 
@@ -19,7 +28,7 @@ You can check which modules are available by running
 banco modules
 ```
 
-Initialize a new banco project
+## Initialize a new banco project
 
 Create an empty directory, and run
 ```sh
@@ -31,12 +40,8 @@ For example, the `notes` folder will be created by the "notes" module, the `task
 
 
 
-
-
-
-
 # Credits
 
 Banco is created by Claudio d'Angelis.
 
-The name "Banco" is a tribute to Banco Del Mutuo Soccorso, the best italian progressive rock band of all times.
+Name "Banco" is a tribute to Banco Del Mutuo Soccorso, the best italian progressive rock band of all times.
