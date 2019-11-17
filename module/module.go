@@ -3,6 +3,7 @@ package module
 import (
 	"github.com/claudiodangelis/banco/item"
 	"github.com/claudiodangelis/banco/module/bookmarks"
+	"github.com/claudiodangelis/banco/module/documents"
 	"github.com/claudiodangelis/banco/module/notes"
 	"github.com/claudiodangelis/banco/module/tasks"
 )
@@ -37,5 +38,6 @@ func All() []Module {
 		notes.Module(),
 		tasks.Module(),
 		bookmarks.Module(),
+		documents.Module(),
 	}
 }
