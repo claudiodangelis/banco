@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/claudiodangelis/banco/util"
+
 	"github.com/claudiodangelis/banco/item"
 	"github.com/claudiodangelis/banco/module"
 	"github.com/claudiodangelis/banco/ui"
@@ -189,6 +191,16 @@ func root(module module.Module) error {
 var rootCmd = &cobra.Command{
 	Use:   "banco",
 	Short: "Launch banco",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// If you are going to initialize, no need to check if this
+		// is a banco directory
+		if cmd.Use == "init" {
+			return
+		}
+		if _, err := util.IsBanco(); err != nil {
+			log.Fatalln("This is not a banco directory:", err)
+		}
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		for {
 			ui.ClearScreen()
