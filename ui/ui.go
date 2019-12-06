@@ -84,7 +84,8 @@ func SelectWithAdd(label, value string, options []string, search bool) (string, 
 			}
 			// Store the query so you can reuse it for the "create new" choice
 			typed = input
-			return strings.Contains(options[index], input)
+			return strings.Contains(strings.ToLower(options[index]),
+				strings.ToLower(input))
 		},
 		Size: goterm.Height() - 3,
 	}
