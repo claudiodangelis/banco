@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/claudiodangelis/banco/util"
 
@@ -204,6 +206,11 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		for {
 			ui.ClearScreen()
+			wd, err := os.Getwd()
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("Welcome to Banco! [Project: %s]\n", filepath.Base(wd))
 			module, err := chooseModule()
 			if err != nil {
 				log.Fatalln(err)
