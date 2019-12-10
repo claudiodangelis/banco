@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/buger/goterm"
@@ -51,7 +50,6 @@ func Select(label string, options []string, value string, search bool) (string, 
 		// https://github.com/manifoldco/promptui/issues/105
 		search = false
 	}
-	sort.Strings(options)
 	prompt := promptui.Select{
 		HideHelp:          true,
 		Label:             label,
@@ -73,7 +71,6 @@ func SelectWithAdd(label, value string, options []string, search bool) (string, 
 		// https://github.com/manifoldco/promptui/issues/105
 		search = false
 	}
-	sort.Strings(options)
 	options = append([]string{"+ Create new"}, options...)
 	typed := ""
 	prompt := promptui.Select{
