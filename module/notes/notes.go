@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -192,6 +193,7 @@ func labels() ([]string, error) {
 	for label := range m {
 		l = append(l, label)
 	}
+	sort.Strings(l)
 	return l, nil
 }
 
