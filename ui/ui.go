@@ -56,7 +56,7 @@ func Select(label string, options []string, value string, search bool) (string, 
 		Items:             options,
 		StartInSearchMode: search,
 		Searcher: func(input string, index int) bool {
-			return strings.Contains(options[index], input)
+			return strings.Contains(strings.ToLower(options[index]), strings.ToLower(input))
 		},
 		Size: goterm.Height() - 3,
 	}
