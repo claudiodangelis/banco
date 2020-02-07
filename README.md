@@ -18,10 +18,11 @@ or by downloading the latest [binary release](https://github.com/claudiodangelis
 
 ## Configuration
 
-Banco needs almost no configuration to get started. You only need to make sure that the two following environment variables are set:
+Banco needs almost no configuration to get started. You only need to make sure that the following environment variables are set:
 
 - `$EDITOR`
 - `$BROWSER`
+- `$FILEMANAGER` (this is optional, see the "documents" module section)
 
 Banco will use the first to open plain text files (notes, tasks), and the second for the bookmarks.
 
@@ -96,6 +97,8 @@ Just like notes, bookmarks are plain text files whose content is an URL. You can
 ### Documents
 
 Everything which cannot be organized as a note, task or bookmark is a document. When opening a document with Banco, the `xdg-open` program will be used to open the file.
+
+**Note** since documents module is at an early stage and might be result in poor user experience, you might want to use your favorite file manager instead. To let banco use an external file manager, just set the `$FILEMANAGER` environment variable.
 
 ## Get started
 
