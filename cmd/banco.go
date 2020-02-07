@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/claudiodangelis/banco/util"
@@ -163,6 +164,18 @@ func chooseModule() (module.Module, error) {
 }
 
 func root(module module.Module) error {
+	// TODO: Since the `documents` module is at an early stage, let user
+	// choose if they want to use an external file manager for documents
+	if fm := os.Getenv("FILEMANAGER"); fm != "" && module.Name() == "documents" {
+		cmd := exec.Command(fm, module.Name())
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		if err := cmd.Run(); err != nil {
+			fmt.Println(err)
+			return err
+		}
+		return nil
+	}
 	item, err := chooseItem(module, true)
 	if err != nil {
 		return err
