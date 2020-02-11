@@ -2,6 +2,7 @@ package documents
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -358,6 +359,19 @@ func (d Documents) List() ([]item.Item, error) {
 		return nil, err
 	}
 	return toItemAll(documents), nil
+}
+
+// Summary of items
+func (d Documents) Summary() string {
+	list, err := list()
+	if err != nil {
+		panic(err)
+	}
+	dirs := make(map[string]bool)
+	for _, note := range list {
+		dirs[note.Directory] = true
+	}
+	return fmt.Sprintf("documents [items: %d, dirs: %d]", len(list), len(dirs))
 }
 
 // Module return the module

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/claudiodangelis/banco/ui"
@@ -252,6 +253,24 @@ func (t Tasks) List() ([]item.Item, error) {
 		items = append(items, toItem(task))
 	}
 	return items, nil
+}
+
+// Summary of items
+func (t Tasks) Summary() string {
+	// TODO: Implement this
+	statuses, err := statuses()
+	if err != nil {
+		panic(err)
+	}
+	var summary []string
+	for _, status := range statuses {
+		files, err := ioutil.ReadDir(filepath.Join("tasks", status))
+		if err != nil {
+			panic(err)
+		}
+		summary = append(summary, fmt.Sprintf("%s: %d", status, len(files)))
+	}
+	return fmt.Sprintf("tasks [%s]", strings.Join(summary, ","))
 }
 
 // Module return the module

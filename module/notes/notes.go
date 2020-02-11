@@ -2,6 +2,7 @@ package notes
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -272,6 +273,19 @@ func (n Notes) List() ([]item.Item, error) {
 		return nil, err
 	}
 	return toItemAll(all), nil
+}
+
+// Summary of items
+func (n Notes) Summary() string {
+	list, err := list()
+	if err != nil {
+		panic(err)
+	}
+	labels := make(map[string]bool)
+	for _, note := range list {
+		labels[note.Label] = true
+	}
+	return fmt.Sprintf("notes [items: %d, labels: %d]", len(list), len(labels))
 }
 
 // Module return the module

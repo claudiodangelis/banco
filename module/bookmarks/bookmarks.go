@@ -2,6 +2,7 @@ package bookmarks
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -290,6 +291,19 @@ func (b Bookmarks) List() ([]item.Item, error) {
 		return nil, err
 	}
 	return toItemAll(bookmarks), nil
+}
+
+// Summary of items
+func (b Bookmarks) Summary() string {
+	list, err := list()
+	if err != nil {
+		panic(err)
+	}
+	groups := make(map[string]bool)
+	for _, bookmark := range list {
+		groups[bookmark.Group] = true
+	}
+	return fmt.Sprintf("bookmarks [URLs: %d, groups: %d]", len(list), len(groups))
 }
 
 // Module return the module
