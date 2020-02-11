@@ -32,6 +32,8 @@ type Module interface {
 	Init() error
 	// List items
 	List() ([]item.Item, error)
+	// Summary of the module
+	Summary() string
 }
 
 // All modules

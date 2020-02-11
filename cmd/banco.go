@@ -146,6 +146,24 @@ func chooseItem(module module.Module, withAdd bool) (item.Item, error) {
 	return item, nil
 }
 
+// chooseModuleWithSummary is an utility function that prompts
+// a list of available modules with a short summary
+func chooseModuleWithSummary() (module.Module, error) {
+	// TODO: This function can be merged into chooseModule()
+	modules := module.All()
+	dict := make(map[string]module.Module)
+	summaries := make([]string, 0, len(modules))
+	for _, module := range modules {
+		dict[module.Summary()] = module
+		summaries = append(summaries, module.Summary())
+	}
+	choice, err := ui.Select("Choose module", summaries, "", false)
+	if err != nil {
+		return nil, err
+	}
+	return dict[choice], nil
+}
+
 // chooseModule is an utility function that prompts
 // a list of available modules
 func chooseModule() (module.Module, error) {
@@ -224,7 +242,7 @@ var rootCmd = &cobra.Command{
 				panic(err)
 			}
 			fmt.Printf("Welcome to Banco! [Project: %s]\n", filepath.Base(wd))
-			module, err := chooseModule()
+			module, err := chooseModuleWithSummary()
 			if err != nil {
 				log.Fatalln(err)
 			}
