@@ -75,8 +75,9 @@ func (n Notes) NewItemParameters() []item.Parameter {
 	}
 	return []item.Parameter{
 		item.Parameter{
-			Name:      "Title",
-			Default:   "",
+			Name: "Title",
+			// TODO: This must be configurable
+			Default:   time.Now().Format("20060102"),
 			InputType: ui.InputText,
 		},
 		item.Parameter{
