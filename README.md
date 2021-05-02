@@ -26,6 +26,12 @@ Banco needs almost no configuration to get started. You only need to make sure t
 
 Banco will use the first to open plain text files (notes, tasks), and the second for the bookmarks.
 
+Modules' configuration can be defined in a YAML text file which will be read by banco in the following two locations:
+- `$HOME/config/banco.yml`
+- `.` (current directory)
+
+Refer to each module's section for the available configuration.
+
 ## Modules
 
 Banco's features are built as modules, there are modules available for management of:
