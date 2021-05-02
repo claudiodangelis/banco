@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/claudiodangelis/banco/config"
 	"github.com/claudiodangelis/banco/ui"
 
 	"github.com/claudiodangelis/banco/item"
@@ -73,11 +74,15 @@ func (n Notes) NewItemParameters() []item.Parameter {
 	if err != nil {
 		panic(err)
 	}
+	ns, err := n.List()
+	if err != nil {
+		panic(err)
+	}
+	cfg := config.New()
 	return []item.Parameter{
 		item.Parameter{
-			Name: "Title",
-			// TODO: This must be configurable
-			Default:   time.Now().Format("20060102"),
+			Name:      "Title",
+			Default:   cfg.GetDefaultTitle("notes", ns),
 			InputType: ui.InputText,
 		},
 		item.Parameter{

@@ -94,6 +94,18 @@ Notes are just plain text files stored in the `notes` folder. If you set a label
 
 There are two ways to represent a task: a plain text file, or a folder of files. "Tasks" module has no concept of labels, instead it uses "statuses". First-level subfolders will be considered statuses of the tasks. When you create a new task, you will be asked which one you want to create it into. By default, Banco creates `backlog`, `doing`, `done`. When opening a task with Banco, the `$EDITOR` value will be used to open the file (or the folder).
 
+Tasks module supports the following configuration properties:
+
+- `title`
+
+Example configuration:
+
+```
+tasks:
+    title: "$id -"
+```
+
+Refer to the "Configuration variables" section below for a list of available variables.
 
 ### Bookmarks
 
@@ -105,6 +117,8 @@ Just like notes, bookmarks are plain text files whose content is an URL. You can
 Everything which cannot be organized as a note, task or bookmark is a document. When opening a document with Banco, the `xdg-open` program will be used to open the file.
 
 **Note** since documents module is at an early stage and might be result in poor user experience, you might want to use your favorite file manager instead. To let banco use an external file manager, just set the `$FILEMANAGER` environment variable.
+
+
 
 ## Get started
 
@@ -168,6 +182,12 @@ Available commands:
 | `help` | | Prints a summary of available commands |
 
 
+# Configuration variables
+
+| Name | Value |
+| --- | --- |
+| `$id` | Replaced with the incremental number of the item to be created |
+| `$timestamp` | Replaced with the number seconds from epoch | 
 
 # Credits
 

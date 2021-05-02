@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/claudiodangelis/banco/ui"
-
+	"github.com/claudiodangelis/banco/config"
 	"github.com/claudiodangelis/banco/item"
+	"github.com/claudiodangelis/banco/ui"
 	"github.com/otiai10/copy"
 )
 
@@ -157,10 +157,16 @@ func (t Tasks) NewItemParameters() []item.Parameter {
 	if err != nil {
 		panic(err)
 	}
+	ts, err := t.List()
+	if err != nil {
+		panic(err)
+	}
+	cfg := config.New()
 	return []item.Parameter{
 		item.Parameter{
 			Name:      "Title",
 			InputType: ui.InputText,
+			Default:   cfg.GetDefaultTitle(t.Name(), ts),
 		},
 		item.Parameter{
 			Name:      "Status",
