@@ -29,6 +29,11 @@ type Bookmark struct {
 	Group     string
 }
 
+// Whether or not the module has templates
+func (b Bookmarks) HasTemplates() bool {
+	return false
+}
+
 // Aliases of the module
 func (b Bookmarks) Aliases() []string {
 	return []string{"b", "bm"}

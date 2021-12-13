@@ -31,6 +31,11 @@ type Task struct {
 	Size      int64
 }
 
+// Whether or not the module has templates
+func (t Tasks) HasTemplates() bool {
+	return true
+}
+
 // Aliases of the module
 func (t Tasks) Aliases() []string {
 	return []string{"t"}

@@ -55,6 +55,11 @@ type Document struct {
 	filetype  string
 }
 
+// Whether or not the module has templates
+func (d Documents) HasTemplates() bool {
+	return false
+}
+
 // Aliases of the module
 func (d Documents) Aliases() []string {
 	return []string{"d", "docs", "doc"}

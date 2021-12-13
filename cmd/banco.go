@@ -19,6 +19,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(initConfigCmd)
 	modules := []string{}
 	// Append sub commands
 	for _, m := range module.All() {

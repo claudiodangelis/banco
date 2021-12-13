@@ -29,6 +29,11 @@ type Note struct {
 	Label     string
 }
 
+// Whether or not the module has templates
+func (n Notes) HasTemplates() bool {
+	return true
+}
+
 // Aliases of the module
 func (n Notes) Aliases() []string {
 	return []string{"n"}
@@ -112,11 +117,26 @@ func save(note Note) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	f, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return err
+	// Check if a template exists
+	cfg := config.New()
+	templatePath, ok := cfg.GetTemplatePath("notes", note.Label)
+	if !ok {
+		f, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+	} else {
+		data, err := ioutil.ReadFile(templatePath)
+		if err != nil {
+			panic(err)
+		}
+		// Write data to dst
+		err = ioutil.WriteFile(filename, data, 0644)
+		if err != nil {
+			panic(err)
+		}
 	}
-	defer f.Close()
 	return nil
 }
 
