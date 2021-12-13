@@ -48,6 +48,6 @@ var initConfigCmd = &cobra.Command{
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		config.InitCustomConfigDirectory(module.AllNames())
+		config.InitCustomConfigDirectory(module.AllNamesWithTemplates())
 	},
 }

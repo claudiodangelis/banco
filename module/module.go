@@ -34,6 +34,8 @@ type Module interface {
 	List() ([]item.Item, error)
 	// Summary of the module
 	Summary() string
+	// Wether or not the module supports templating
+	HasTemplates() bool
 }
 
 // All modules
@@ -47,10 +49,12 @@ func All() []Module {
 }
 
 // All module names
-func AllNames() []string {
+func AllNamesWithTemplates() []string {
 	var names []string
 	for _, module := range All() {
-		names = append(names, module.Name())
+		if module.HasTemplates() {
+			names = append(names, module.Name())
+		}
 	}
 	return names
 }
