@@ -162,16 +162,12 @@ func (t Tasks) NewItemParameters() []item.Parameter {
 	if err != nil {
 		panic(err)
 	}
-	ts, err := t.List()
-	if err != nil {
-		panic(err)
-	}
 	cfg := config.New()
 	return []item.Parameter{
 		item.Parameter{
 			Name:      "Title",
 			InputType: ui.InputText,
-			Default:   cfg.GetDefaultTitle(t.Name(), ts),
+			Default:   cfg.GetDefaultTitle(t.Name()),
 		},
 		item.Parameter{
 			Name:      "Status",
