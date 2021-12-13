@@ -1,15 +1,18 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/claudiodangelis/banco/item"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	initConfigFile()
+}
 
 func initConfigFile() {
 	home, _ := os.UserHomeDir()
@@ -27,38 +30,35 @@ type Config struct {
 	Path string
 }
 
-var instances map[string]*viper.Viper
-
-func init() {
-	instances = make(map[string]*viper.Viper)
-}
-
-func (c Config) Get(s string) interface{} {
-	fmt.Println(len(instances))
-	for k, v := range instances {
-		fmt.Println("k", k)
-		fmt.Println("v", v)
-	}
-	fmt.Printf(".Get %p", &c)
-	return instances[fmt.Sprintf("%p", &c)].Get(s)
+func (c Config) Get(s string) string {
+	return viperInstance.GetString(s)
 }
 
 // GetDefaultTitle returns the default title based on some values
-func (c Config) GetDefaultTitle(module string, items []item.Item) string {
-	if c.Get(fmt.Sprintf("%s.title", module)) == nil {
-		return ""
-	}
-	title := c.Get(fmt.Sprintf("%s.title", module)).(string)
-	title = strings.ReplaceAll(title, "$id", fmt.Sprintf("%04d", len(items)+1))
-	title = strings.ReplaceAll(title, "$timestamp", time.Now().Format("20060102"))
-
-	return title
+func (c Config) GetDefaultTitle(module string) string {
+	return c.Get(fmt.Sprintf("%s.title", module))
+	// TODO: This should be moved inside each module package
+	// title = strings.ReplaceAll(title, "$id", fmt.Sprintf("%04d", len(items)+1))
+	// title = strings.ReplaceAll(title, "$timestamp", time.Now().Format("20060102"))
 }
 
+// Returns the path to the template, if it exists, otherwise empty string
+func (c Config) GetTemplatePath(module, label string) (string, bool) {
+	// Check if template exists
+	parts := strings.Split(label, "/")
+	path := append([]string{filepath.Dir(c.Path), "templates", module}, parts...)
+	path = append(path, "template")
+	if _, err := os.Stat(filepath.Join(path...)); errors.Is(err, os.ErrNotExist) {
+		return "", false
+	}
+	return filepath.Join(path...), true
+}
+
+var viperInstance *viper.Viper
+
 func New() Config {
-	initConfigFile()
 	cfg := Config{}
-	viperInstance := viper.New()
+	viperInstance = viper.New()
 	viperInstance.SetConfigName("config.yml")
 	viperInstance.SetConfigType("yaml")
 	viperInstance.AddConfigPath(".banco")
@@ -67,7 +67,5 @@ func New() Config {
 		panic(fmt.Errorf("fatal error config file: %s", err))
 	}
 	cfg.Path = viperInstance.ConfigFileUsed()
-	fmt.Println("about to add", fmt.Sprintf("%p", &cfg), "with value", viperInstance)
-	instances[fmt.Sprintf("%p", &cfg)] = viperInstance
 	return cfg
 }
