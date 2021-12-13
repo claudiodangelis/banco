@@ -45,3 +45,12 @@ func All() []Module {
 		documents.Module(),
 	}
 }
+
+// All module names
+func AllNames() []string {
+	var names []string
+	for _, module := range All() {
+		names = append(names, module.Name())
+	}
+	return names
+}

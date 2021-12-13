@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 
+	"github.com/claudiodangelis/banco/config"
 	"github.com/claudiodangelis/banco/module"
 	"github.com/claudiodangelis/banco/util"
 	"github.com/spf13/cobra"
@@ -21,7 +23,7 @@ var initCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 		dirempty, err := util.IsEmptyDir(dir)
-		if dirempty == false {
+		if !dirempty {
 			log.Fatalf("directory %s is not empty", dir)
 		}
 		if err != nil {
@@ -34,5 +36,18 @@ var initCmd = &cobra.Command{
 				log.Println(err)
 			}
 		}
+	},
+}
+
+var initConfigCmd = &cobra.Command{
+	Use:   "init-config",
+	Short: "Initializes a new configuration directory in the current Banco project",
+	Long:  "Initializes a new configuration directory in the current Banco project",
+	Run: func(cmd *cobra.Command, args []string) {
+		if ok, err := util.IsBanco(); !ok {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		config.InitCustomConfigDirectory(module.AllNames())
 	},
 }

@@ -107,6 +107,7 @@ func save(note Note) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
+	// Check if a template exists
 	f, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err

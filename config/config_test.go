@@ -42,7 +42,7 @@ func Test_initConfigFile(t *testing.T) {
 		// NOTE: this will probably only work Linux
 		os.Setenv("HOME", tmpdir)
 		t.Run(tt.name, func(t *testing.T) {
-			initConfigFile()
+			initDefaultConfigFile()
 		})
 
 	}
@@ -50,7 +50,7 @@ func Test_initConfigFile(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	fakehome := setFakeHome()
-	initConfigFile()
+	initDefaultConfigFile()
 	tests := []struct {
 		name       string
 		projectDir string

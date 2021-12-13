@@ -11,10 +11,10 @@ import (
 )
 
 func init() {
-	initConfigFile()
+	initDefaultConfigFile()
 }
 
-func initConfigFile() {
+func initDefaultConfigFile() {
 	home, _ := os.UserHomeDir()
 	path := filepath.Join(home, ".config/banco")
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
@@ -28,6 +28,26 @@ func initConfigFile() {
 
 type Config struct {
 	Path string
+}
+
+func InitCustomConfigDirectory(modules []string) {
+	// Create the config dir
+	if err := os.Mkdir(".banco", os.ModePerm); err != nil {
+		panic(err)
+	}
+	if _, err := os.OpenFile(filepath.Join(".banco", "config.yml"), os.O_RDONLY|os.O_CREATE, 0666); err != nil {
+		panic(err)
+	}
+	// Create the template directories
+	for _, module := range modules {
+		if err := os.MkdirAll(filepath.Join(".banco", "templates", module), os.ModePerm); err != nil {
+			panic(err)
+		}
+		// Create blank templates
+		if _, err := os.OpenFile(filepath.Join(".banco", "templates", module, "template"), os.O_RDONLY|os.O_CREATE, 0666); err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (c Config) Get(s string) string {
