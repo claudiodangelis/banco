@@ -81,12 +81,12 @@ func (n Notes) NewItemParameters() []item.Parameter {
 	}
 	cfg := config.New()
 	return []item.Parameter{
-		item.Parameter{
+		{
 			Name:      "Title",
 			Default:   cfg.GetDefaultTitle("notes"),
 			InputType: ui.InputText,
 		},
-		item.Parameter{
+		{
 			Name:      "Label",
 			Default:   "",
 			InputType: ui.InputSelectWithAdd,
