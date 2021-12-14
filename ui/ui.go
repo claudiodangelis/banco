@@ -66,11 +66,6 @@ func Select(label string, options []string, value string, search bool) (string, 
 
 // SelectWithAdd prompts a list and adds the ability of create a new entry
 func SelectWithAdd(label, value string, options []string, search bool) (string, error) {
-	if value != "" {
-		// NOTE: Addressing a possible manifoldco/promptui bug:
-		// https://github.com/manifoldco/promptui/issues/105
-		search = false
-	}
 	options = append([]string{"+ Create new"}, options...)
 	typed := ""
 	prompt := promptui.Select{

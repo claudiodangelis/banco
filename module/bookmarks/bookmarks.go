@@ -80,17 +80,17 @@ func (b Bookmarks) NewItemParameters() []item.Parameter {
 		panic(err)
 	}
 	return []item.Parameter{
-		item.Parameter{
+		{
 			Name:      "Title",
 			Default:   "",
 			InputType: ui.InputText,
 		},
-		item.Parameter{
+		{
 			Name:      "URL",
 			Default:   "",
 			InputType: ui.InputText,
 		},
-		item.Parameter{
+		{
 			Name:      "Group",
 			Default:   "",
 			InputType: ui.InputSelectWithAdd,
@@ -220,7 +220,7 @@ func list() ([]Bookmark, error) {
 	if _, err := os.Stat("bookmarks"); os.IsNotExist(err) {
 		return bookmarks, err
 	}
-	if err := filepath.Walk("bookmarks", func(path string, info os.FileInfo, err error) error {
+	if err := filepath.Walk("bookmarks", func(path string, info os.FileInfo, fnerr error) error {
 		if info.IsDir() {
 			return nil
 		}

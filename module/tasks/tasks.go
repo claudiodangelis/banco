@@ -164,18 +164,18 @@ func (t Tasks) NewItemParameters() []item.Parameter {
 	}
 	cfg := config.New()
 	return []item.Parameter{
-		item.Parameter{
+		{
 			Name:      "Title",
 			InputType: ui.InputText,
 			Default:   cfg.GetDefaultTitle(t.Name()),
 		},
-		item.Parameter{
+		{
 			Name:      "Status",
 			InputType: ui.InputSelectWithAdd,
 			Options:   statuses,
 			Default:   statuses[0],
 		},
-		item.Parameter{
+		{
 			Name:      "Is a directory",
 			InputType: ui.InputSelect,
 			Options:   []string{"Yes", "No"},
