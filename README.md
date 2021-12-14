@@ -110,7 +110,8 @@ Refer to the "Configuration variables" section below for a list of available var
 ### Bookmarks
 
 
-Just like notes, bookmarks are plain text files whose content is an URL. You can group bookmarks by labels. When opening a bookmark with banco, the `$BROWSER` value will be used to open the URL.
+Just like notes, bookmarks are plain text files whose content is an URL. You can group bookmarks by labels. When opening a bookmark with banco, the `$BROWSER` value, if set, is used to open the URL.
+Optionally, you can set the browser command and arguments in the configuration file.
 
 #### Configuration file keys (optional)
 
