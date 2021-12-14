@@ -262,11 +262,11 @@ func getBrowserConfiguration() (cmd string, args []string) {
 // OpenItem with $BROWSER
 func (b Bookmarks) OpenItem(item item.Item) error {
 	bookmark := toBookmark(item)
-	browser := os.Getenv("BROWSER")
-	if browser == "" {
-		return errors.New("$BROWSER is not defined")
-	}
 	browsercmd, browserargs := getBrowserConfiguration()
+	if browsercmd == "" {
+		return errors.New("$BROWSER variable not set and no browser configured")
+
+	}
 	browserargs = append(browserargs, bookmark.URL)
 	cmd := exec.Command(browsercmd, browserargs...)
 	cmd.Stdin = os.Stdin
