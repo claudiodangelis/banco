@@ -54,6 +54,10 @@ func (c Config) Get(s string) string {
 	return viperInstance.GetString(s)
 }
 
+func (c Config) GetStrings(s string) []string {
+	return viperInstance.GetStringSlice(s)
+}
+
 // GetDefaultTitle returns the default title based on some values
 func (c Config) GetDefaultTitle(module string) string {
 	return c.Get(fmt.Sprintf("%s.title", module))

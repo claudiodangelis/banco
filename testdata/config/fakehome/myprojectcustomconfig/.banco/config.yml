@@ -1,2 +1,6 @@
 notes:
   title: you are awesome
+bookmarks:
+  browser:
+    cmd: firefox
+    args: ["-p", "work"]
