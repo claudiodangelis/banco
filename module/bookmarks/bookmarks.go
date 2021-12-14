@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/claudiodangelis/banco/config"
 	"github.com/claudiodangelis/banco/ui"
 
 	"github.com/claudiodangelis/banco/item"
@@ -247,6 +248,17 @@ func list() ([]Bookmark, error) {
 	return bookmarks, nil
 }
 
+func getBrowserConfiguration() (cmd string, args []string) {
+	cfg := config.New()
+	// Read config file first
+	cmd = cfg.Get("bookmarks.browser.cmd")
+	args = cfg.GetStrings("bookmarks.browser.args")
+	if cmd == "" {
+		cmd = os.Getenv("BROWSER")
+	}
+	return cmd, args
+}
+
 // OpenItem with $BROWSER
 func (b Bookmarks) OpenItem(item item.Item) error {
 	bookmark := toBookmark(item)
@@ -254,7 +266,9 @@ func (b Bookmarks) OpenItem(item item.Item) error {
 	if browser == "" {
 		return errors.New("$BROWSER is not defined")
 	}
-	cmd := exec.Command(browser, bookmark.URL)
+	browsercmd, browserargs := getBrowserConfiguration()
+	browserargs = append(browserargs, bookmark.URL)
+	cmd := exec.Command(browsercmd, browserargs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	err := cmd.Run()

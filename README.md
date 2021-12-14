@@ -112,6 +112,23 @@ Refer to the "Configuration variables" section below for a list of available var
 
 Just like notes, bookmarks are plain text files whose content is an URL. You can group bookmarks by labels. When opening a bookmark with banco, the `$BROWSER` value will be used to open the URL.
 
+#### Configuration file keys (optional)
+
+| Key | Type | Description |
+| --- | ---- | ----------- |
+| `browser` | _Object_ | See below |
+| `browser.cmd` | _String_ | Program name to use for opening bookmarks. It overrides `$BROWSER` environment variable |
+| `browser.args` | _List of Strings_ | Program arguments |
+
+Example
+
+```
+bookmarks:
+    browser:
+        cmd: firefox
+        args: ["-p", "work"]
+```
+
 ### Documents
 
 Everything which cannot be organized as a note, task or bookmark is a document. When opening a document with Banco, the `xdg-open` program will be used to open the file.
