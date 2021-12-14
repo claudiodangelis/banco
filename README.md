@@ -168,6 +168,7 @@ Available commands:
 | Command | Argument |Description |
 | ---| --- | --- |
 | `init` | | Initializes a new Banco project |
+| `init-config` | | Initializes a configuration directory inside the current Banco project |
 | `modules` | | List available modules |
 | `notes` | | Shows the root of the notes module. After choosing a note, you can choose what to do with it: open, update, delete |
 | `tasks` | | Shows the root of the tasks module. After choosing a task, you can choose what to do with it: open, update, delete |
