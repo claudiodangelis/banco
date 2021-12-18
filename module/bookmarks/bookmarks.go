@@ -271,8 +271,10 @@ func (b Bookmarks) OpenItem(item item.Item) error {
 	cmd := exec.Command(browsercmd, browserargs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
-	err := cmd.Run()
-	return err
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // toBookmark converts an item to a bookmark
