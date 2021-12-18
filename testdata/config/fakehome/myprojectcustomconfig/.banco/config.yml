@@ -1,5 +1,7 @@
 notes:
   title: you are awesome
+tasks:
+  title: $id
 bookmarks:
   browser:
     cmd: firefox

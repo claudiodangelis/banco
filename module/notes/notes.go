@@ -80,10 +80,14 @@ func (n Notes) NewItemParameters() []item.Parameter {
 		panic(err)
 	}
 	cfg := config.New()
+	list, err := n.List()
+	if err != nil {
+		panic(err)
+	}
 	return []item.Parameter{
 		{
 			Name:      "Title",
-			Default:   cfg.GetDefaultTitle("notes"),
+			Default:   cfg.GetDefaultTitle("notes", list),
 			InputType: ui.InputText,
 		},
 		{

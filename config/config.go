@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/claudiodangelis/banco/item"
 	"github.com/spf13/viper"
 )
 
@@ -59,11 +61,12 @@ func (c Config) GetStrings(s string) []string {
 }
 
 // GetDefaultTitle returns the default title based on some values
-func (c Config) GetDefaultTitle(module string) string {
-	return c.Get(fmt.Sprintf("%s.title", module))
+func (c Config) GetDefaultTitle(module string, items []item.Item) string {
+	title := c.Get(fmt.Sprintf("%s.title", module))
 	// TODO: This should be moved inside each module package
-	// title = strings.ReplaceAll(title, "$id", fmt.Sprintf("%04d", len(items)+1))
-	// title = strings.ReplaceAll(title, "$timestamp", time.Now().Format("20060102"))
+	title = strings.ReplaceAll(title, "$id", fmt.Sprintf("%04d", len(items)+1))
+	title = strings.ReplaceAll(title, "$timestamp", time.Now().Format("20060102"))
+	return title
 }
 
 // Returns the path to the template, if it exists, otherwise empty string

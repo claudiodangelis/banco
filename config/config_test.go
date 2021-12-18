@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+
+	"github.com/claudiodangelis/banco/item"
 )
 
 func setFakeHome() string {
@@ -96,13 +98,15 @@ func TestConfig_GetDefaultTitle(t *testing.T) {
 		module string
 	}
 	tests := []struct {
-		name       string
-		projectDir string
-		args       args
-		want       string
+		name        string
+		itemsLength int
+		projectDir  string
+		args        args
+		want        string
 	}{
 		{
 			"global title",
+			0,
 			"myproject",
 			args{
 				module: "notes",
@@ -111,11 +115,30 @@ func TestConfig_GetDefaultTitle(t *testing.T) {
 		},
 		{
 			"custom title",
+			0,
 			"myprojectcustomconfig",
 			args{
 				module: "notes",
 			},
 			"you are awesome",
+		},
+		{
+			"title variable",
+			0,
+			"myprojectcustomconfig",
+			args{
+				module: "tasks",
+			},
+			"0001",
+		},
+		{
+			"more title variable",
+			10,
+			"myprojectcustomconfig",
+			args{
+				module: "tasks",
+			},
+			"0011",
 		},
 	}
 	for _, tt := range tests {
@@ -128,7 +151,7 @@ func TestConfig_GetDefaultTitle(t *testing.T) {
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			c := New()
-			if got := c.GetDefaultTitle(tt.args.module); got != tt.want {
+			if got := c.GetDefaultTitle(tt.args.module, make([]item.Item, tt.itemsLength)); got != tt.want {
 				t.Errorf("Config.GetDefaultTitle() = %v, want %v", got, tt.want)
 			}
 		})
