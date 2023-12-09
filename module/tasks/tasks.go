@@ -223,6 +223,9 @@ func (t Tasks) OpenItem(item item.Item) error {
 func (t Tasks) UpdateItem(currentItem, nextItem item.Item) error {
 	current := toTask(currentItem)
 	next := toTask(nextItem)
+	if next.Path() == current.Path() {
+		return nil
+	}
 	if err := copy.Copy(current.Path(), next.Path()); err != nil {
 		log.Fatalln(err)
 	}
