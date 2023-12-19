@@ -3,7 +3,7 @@ module github.com/claudiodangelis/banco
 go 1.17
 
 require (
-	github.com/buger/goterm v1.0.3
+	github.com/buger/goterm v1.0.4
 	github.com/manifoldco/promptui v0.9.0
 	github.com/otiai10/copy v1.7.0
 	github.com/spf13/cobra v1.2.1
