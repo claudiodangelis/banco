@@ -228,3 +228,40 @@ func TestConfig_GetTemplatePath(t *testing.T) {
 		}
 	}
 }
+
+func TestGetNew(t *testing.T) {
+	setFakeHome()
+	New()
+	tests := []struct {
+		name string
+		want NewConfig
+	}{
+		{
+			"#1",
+			NewConfig{
+				Notes: struct{ Title string }{"hello"},
+				Tasks: struct {
+					Title     string
+					Providers []TasksProvider
+				}{
+					Providers: []TasksProvider{
+						{
+							Provider: "github",
+							Name:     "myrepo",
+							Parameters: map[string]string{
+								"apikey": "abc",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetNew(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetNew() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

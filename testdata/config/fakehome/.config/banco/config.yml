@@ -1,2 +1,8 @@
 notes:
   title: hello
+tasks:
+  providers:
+    - provider: github
+      name: myrepo
+      parameters:
+        apikey: abc

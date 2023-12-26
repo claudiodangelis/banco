@@ -83,6 +83,15 @@ func (c Config) GetTemplatePath(module, label string) (string, bool) {
 
 var viperInstance *viper.Viper
 
+// TODO: rename this function
+func GetNew() NewConfig {
+	var cfg NewConfig
+	if err := viperInstance.Unmarshal(&cfg); err != nil {
+		panic(err)
+	}
+	return cfg
+}
+
 func New() Config {
 	cfg := Config{}
 	viperInstance = viper.New()
