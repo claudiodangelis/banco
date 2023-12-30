@@ -5,16 +5,16 @@ import (
 
 	"github.com/claudiodangelis/banco/item"
 	"github.com/claudiodangelis/banco/module"
+	"github.com/claudiodangelis/banco/provider"
 	"github.com/claudiodangelis/banco/ui"
 	"github.com/spf13/cobra"
 )
 
-// create a new item. This should have been called new() for consistency,
-// but that's a reserved word in Go ¯\_(ツ)_/¯
-func create(m module.Module) error {
+func create(m module.Module, prv provider.Provider) error {
 	// Create empty
-	item := make(item.Item)
-	for _, input := range m.NewItemParameters() {
+	item := item.Item{}
+	params := make(map[string]string)
+	for _, input := range prv.NewItemParameters() {
 		var result string
 		if input.InputType == ui.InputText {
 			output, err := ui.Input(input.Name, input.Default)
@@ -35,14 +35,15 @@ func create(m module.Module) error {
 			}
 			result = output
 		}
-		item[input.Name] = result
+		params[input.Name] = result
 	}
-	if err := m.SaveItem(item); err != nil {
+	item.Parameters = params
+	result, err := prv.SaveItem(item)
+	if err != nil {
 		return err
 	}
 	// Open it
-	err := m.OpenItem(item)
-	return err
+	return m.OpenItem(result)
 }
 
 var newCmd = &cobra.Command{
@@ -54,7 +55,8 @@ var newCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-		if err := create(module); err != nil {
+		provider := chooseProvider(module)
+		if err := create(module, provider); err != nil {
 			log.Fatalln(err)
 		}
 	},

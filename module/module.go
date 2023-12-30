@@ -1,60 +1,111 @@
 package module
 
 import (
+	"errors"
+	"os"
+	"os/exec"
+
+	"github.com/claudiodangelis/banco/config"
 	"github.com/claudiodangelis/banco/item"
-	"github.com/claudiodangelis/banco/module/bookmarks"
-	"github.com/claudiodangelis/banco/module/documents"
-	"github.com/claudiodangelis/banco/module/notes"
-	"github.com/claudiodangelis/banco/module/tasks"
+	"github.com/claudiodangelis/banco/provider"
+
+	// TODO: this is ugly!
+	localtasks "github.com/claudiodangelis/banco/provider/tasks/local"
 )
 
-// Module for banco
-type Module interface {
-	// Name of the module
-	Name() string
-	// Aliases of the module
-	Aliases() []string
-	// Singular name of the module
-	Singular() string
-	// NewItemParameters to be input when creating a new item
-	NewItemParameters() []item.Parameter
-	// UpdateItemParameters to be input when updating an item
-	UpdateItemParameters(item.Item) []item.Parameter
-	// SaveItem stores a new item
-	SaveItem(item.Item) error
-	// OpenItem opens the item
-	OpenItem(item.Item) error
-	// UpdateItem updates current item to next item
-	UpdateItem(current, next item.Item) error
-	// DeleteItem from the module folder
-	DeleteItem(item.Item) error
-	// Init initializes the module
-	Init() error
-	// List items
-	List() ([]item.Item, error)
-	// Summary of the module
-	Summary() string
-	// Wether or not the module supports templating
-	HasTemplates() bool
+type ModuleName string
+
+const ModuleTasks ModuleName = "tasks"
+const ModuleNotes ModuleName = "notes"
+const ModuleBookmarks ModuleName = "bookmarks"
+const ModuleDocuments ModuleName = "documents"
+
+type Module struct {
+	Name      ModuleName
+	Providers map[string]provider.Provider
 }
 
-// All modules
-func All() []Module {
-	return []Module{
-		notes.Module(),
-		tasks.Module(),
-		bookmarks.Module(),
-		documents.Module(),
+func (m Module) ListItems() ([]item.Item, error) {
+	var items []item.Item
+	for _, prv := range m.Providers {
+		list, err := prv.List()
+		if err != nil {
+			return items, err
+		}
+		items = append(items, list...)
 	}
+	return items, nil
 }
 
-// All module names
-func AllNamesWithTemplates() []string {
-	var names []string
-	for _, module := range All() {
-		if module.HasTemplates() {
-			names = append(names, module.Name())
+func (m Module) OpenItem(item item.Item) error {
+	// TODO: implement module-based opening (URLs, documents)
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		return errors.New("$EDITOR is not defined")
+	}
+	cmd := exec.Command(editor, item.Resource)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	return cmd.Run()
+}
+
+func (m Module) Init() error {
+	if err := os.Mkdir(string(m.Name), os.ModePerm); err != nil {
+		return err
+	}
+	for _, prv := range m.Providers {
+		if err := prv.Sync(); err != nil {
+			return err
 		}
 	}
-	return names
+	return nil
+}
+
+func All() []Module {
+	var modules []Module
+	cfg := config.New()
+	for _, m := range []ModuleName{
+		ModuleTasks,
+		// ModuleNotes,
+		// ModuleBookmarks,
+		// ModuleDocuments,
+	} {
+		module := Module{
+			Name:      m,
+			Providers: getEnabledProviders(m, cfg),
+		}
+		modules = append(modules, module)
+	}
+	return modules
+}
+
+func New(name ModuleName) Module {
+	// TODO: implement this
+	cfg := config.New()
+	return Module{
+		Name:      name,
+		Providers: getEnabledProviders(name, cfg),
+	}
+}
+
+// TODO: this function is very poorly written
+func getEnabledProviders(name ModuleName, cfg config.Config) map[string]provider.Provider {
+	providers := make(map[string]provider.Provider)
+	if name == ModuleTasks {
+		for _, cfgprovider := range cfg.Tasks.Providers {
+			var prv provider.Provider
+			if !cfgprovider.Disabled {
+				// TODO: THIS IS HARDCODED
+				if cfgprovider.Provider == "local" {
+					prv = localtasks.New("tasks/local", cfgprovider)
+				}
+				prvName := prv.Name()
+				if cfgprovider.Alias != "" {
+					prvName = cfgprovider.Alias
+				}
+				providers[prvName] = prv
+			}
+		}
+	}
+	return providers
 }

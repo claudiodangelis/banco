@@ -1,7 +1,6 @@
 package util
 
 import (
-	"io/ioutil"
 	"os"
 
 	"github.com/claudiodangelis/banco/module"
@@ -10,7 +9,7 @@ import (
 // IsEmptyDir returns (true, nil) if dir is empty, (false, error) otherwise
 // Credits: https://rosettacode.org/wiki/Empty_directory#Go
 func IsEmptyDir(name string) (bool, error) {
-	entries, err := ioutil.ReadDir(name)
+	entries, err := os.ReadDir(name)
 	if err != nil {
 		return false, err
 	}
@@ -19,8 +18,9 @@ func IsEmptyDir(name string) (bool, error) {
 
 // IsBanco returns (true, nil) if the cwd is a banco directory
 func IsBanco() (bool, error) {
+	// TODO: this does not guarantee that the folder is an actual banco folder
 	for _, m := range module.All() {
-		if _, err := os.Stat(m.Name()); os.IsNotExist(err) {
+		if _, err := os.Stat(string(m.Name)); os.IsNotExist(err) {
 			return false, err
 		}
 	}

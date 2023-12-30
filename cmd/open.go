@@ -20,7 +20,7 @@ var openCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-		item, err := chooseItem(module, false)
+		item, err := chooseItem(module)
 		if err != nil {
 			log.Fatalln(err)
 		}
