@@ -35,8 +35,8 @@ func TestNew(t *testing.T) {
 			},
 			Module{
 				Name: ModuleTasks,
-				Providers: []provider.Provider{
-					localtasks.New("tasks/local", config.ProviderConfig{
+				Providers: map[string]provider.Provider{
+					"local": localtasks.New("tasks/local", config.ProviderConfig{
 						Provider: "local",
 						Disabled: true,
 					}),

@@ -1,11 +1,10 @@
 package item
 
 // Item of a banco module
-type Item map[string]string
-
-// Name is a string representation of the item
-func (i Item) Name() string {
-	return i["Name"]
+type Item struct {
+	Parameters map[string]string
+	// Resource can be a path or URL
+	Resource string
 }
 
 // Parameter of the item

@@ -1,7 +1,9 @@
 package module
 
 import (
+	"errors"
 	"os"
+	"os/exec"
 
 	"github.com/claudiodangelis/banco/config"
 	"github.com/claudiodangelis/banco/item"
@@ -20,11 +22,23 @@ const ModuleDocuments ModuleName = "documents"
 
 type Module struct {
 	Name      ModuleName
-	Providers []provider.Provider
+	Providers map[string]provider.Provider
 }
 
 func (m Module) ListItems() []item.Item {
 	return []item.Item{}
+}
+
+func (m Module) OpenItem(item item.Item) error {
+	// TODO: implement module-based opening (URLs, documents)
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		return errors.New("$EDITOR is not defined")
+	}
+	cmd := exec.Command(editor, item.Resource)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	return cmd.Run()
 }
 
 func (m Module) Init() error {
@@ -66,8 +80,9 @@ func New(name ModuleName) Module {
 	}
 }
 
-func getEnabledProviders(name ModuleName, cfg config.Config) []provider.Provider {
-	var providers []provider.Provider
+// TODO: this function is very poorly written
+func getEnabledProviders(name ModuleName, cfg config.Config) map[string]provider.Provider {
+	providers := make(map[string]provider.Provider)
 	if name == ModuleTasks {
 		for _, cfgprovider := range cfg.Tasks.Providers {
 			var prv provider.Provider
@@ -76,9 +91,12 @@ func getEnabledProviders(name ModuleName, cfg config.Config) []provider.Provider
 				if cfgprovider.Provider == "local" {
 					prv = localtasks.New("tasks/local", cfgprovider)
 				}
-				providers = append(providers, prv)
+				prvName := prv.Name()
+				if cfgprovider.Alias != "" {
+					prvName = cfgprovider.Alias
+				}
+				providers[prvName] = prv
 			}
-
 		}
 	}
 	return providers

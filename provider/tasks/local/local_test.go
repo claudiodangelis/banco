@@ -28,14 +28,18 @@ func TestTaskProvider_List(t *testing.T) {
 			},
 			[]item.Item{
 				{
-					"Title":  "0001 - TEST",
-					"Status": "backlog",
-					"IsDir":  "No",
+					Parameters: map[string]string{
+						"Title":  "0001 - TEST",
+						"Status": "backlog",
+						"IsDir":  "No",
+					},
 				},
 				{
-					"Title":  "0002 - WIP",
-					"Status": "doing",
-					"IsDir":  "Yes",
+					Parameters: map[string]string{
+						"Title":  "0002 - WIP",
+						"Status": "doing",
+						"IsDir":  "Yes",
+					},
 				},
 			},
 		},

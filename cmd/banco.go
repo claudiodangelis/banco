@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/claudiodangelis/banco/module"
+	"github.com/claudiodangelis/banco/provider"
 	"github.com/claudiodangelis/banco/ui"
 	"github.com/claudiodangelis/banco/util"
 	"github.com/spf13/cobra"
@@ -14,6 +15,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(newCmd)
 }
 
 var rootCmd = &cobra.Command{
@@ -76,4 +78,27 @@ func chooseModule() (module.Module, error) {
 		return module.Module{}, err
 	}
 	return dict[module.ModuleName(choice)], nil
+}
+
+// chooseProvider is an utility fuynction that prompts
+// a list of available providers for the given module.
+// If only one provider is available, no list is prompted
+func chooseProvider(m module.Module) provider.Provider {
+	// TODO: only list providers with proper capability
+	// i.e.: create, delete, etc
+	if len(m.Providers) == 1 {
+		for _, provider := range m.Providers {
+			return provider
+		}
+	}
+	var providers []string
+	for alias := range m.Providers {
+		providers = append(providers, alias)
+	}
+	choice, err := ui.Select("Choose provider", providers, "", false)
+	if err != nil {
+		// TODO: handle this properly
+		panic(err)
+	}
+	return m.Providers[choice]
 }
