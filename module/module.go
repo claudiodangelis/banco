@@ -31,19 +31,28 @@ func (m Module) Init() error {
 	if err := os.Mkdir(string(m.Name), os.ModePerm); err != nil {
 		return err
 	}
-	// TODO: initialize default providers
+	for _, prv := range m.Providers {
+		if err := prv.Sync(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func All() []Module {
 	var modules []Module
+	cfg := config.New()
 	for _, m := range []ModuleName{
 		ModuleTasks,
 		// ModuleNotes,
 		// ModuleBookmarks,
 		// ModuleDocuments,
 	} {
-		modules = append(modules, Module{Name: m})
+		module := Module{
+			Name:      m,
+			Providers: getEnabledProviders(m, cfg),
+		}
+		modules = append(modules, module)
 	}
 	return modules
 }
