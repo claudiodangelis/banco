@@ -1,6 +1,8 @@
 package module
 
 import (
+	"os"
+
 	"github.com/claudiodangelis/banco/config"
 	"github.com/claudiodangelis/banco/item"
 	"github.com/claudiodangelis/banco/provider"
@@ -13,6 +15,8 @@ type ModuleName string
 
 const ModuleTasks ModuleName = "tasks"
 const ModuleNotes ModuleName = "notes"
+const ModuleBookmarks ModuleName = "bookmarks"
+const ModuleDocuments ModuleName = "documents"
 
 type Module struct {
 	Name      ModuleName
@@ -23,8 +27,25 @@ func (m Module) ListItems() []item.Item {
 	return []item.Item{}
 }
 
+func (m Module) Init() error {
+	if err := os.Mkdir(string(m.Name), os.ModePerm); err != nil {
+		return err
+	}
+	// TODO: initialize default providers
+	return nil
+}
+
 func All() []Module {
-	return []Module{}
+	var modules []Module
+	for _, m := range []ModuleName{
+		ModuleTasks,
+		// ModuleNotes,
+		// ModuleBookmarks,
+		// ModuleDocuments,
+	} {
+		modules = append(modules, Module{Name: m})
+	}
+	return modules
 }
 
 func New(name ModuleName) Module {
