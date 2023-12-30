@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/claudiodangelis/banco/item"
 	"github.com/claudiodangelis/banco/module"
 	"github.com/claudiodangelis/banco/provider"
 	"github.com/claudiodangelis/banco/ui"
@@ -16,6 +17,7 @@ import (
 func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(newCmd)
+	rootCmd.AddCommand(openCmd)
 }
 
 var rootCmd = &cobra.Command{
@@ -39,11 +41,10 @@ var rootCmd = &cobra.Command{
 				panic(err)
 			}
 			fmt.Printf("Welcome to Banco! [Project: %s]\n", filepath.Base(wd))
-			module, err := chooseModule()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			fmt.Println("you want", module)
+			// module, err := chooseModule()
+			// if err != nil {
+			// 	log.Fatalln(err)
+			// }
 			// TODO: review the following
 			// switch err := root(module); err {
 			// case ui.ErrInterrupt:
@@ -101,4 +102,25 @@ func chooseProvider(m module.Module) provider.Provider {
 		panic(err)
 	}
 	return m.Providers[choice]
+}
+
+// chooseItem shows a list of available items for the module;
+// it aggregates items from all the enabled providers
+func chooseItem(module module.Module) (item.Item, error) {
+	list, err := module.ListItems()
+	if err != nil {
+		return item.Item{}, err
+	}
+	listAsStringSlice := []string{}
+	listAsMap := make(map[string]item.Item)
+	for _, item := range list {
+		listAsStringSlice = append(listAsStringSlice, item.Resource)
+		listAsMap[item.Resource] = item
+	}
+	// TODO: phrasing
+	result, err := ui.Select("Choose", listAsStringSlice, "", true)
+	if err != nil {
+		return item.Item{}, err
+	}
+	return listAsMap[result], nil
 }

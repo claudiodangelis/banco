@@ -33,6 +33,7 @@ func TestTaskProvider_List(t *testing.T) {
 						"Status": "backlog",
 						"IsDir":  "No",
 					},
+					Resource: "tasks/local/backlog/0001 - TEST",
 				},
 				{
 					Parameters: map[string]string{
@@ -40,6 +41,7 @@ func TestTaskProvider_List(t *testing.T) {
 						"Status": "doing",
 						"IsDir":  "Yes",
 					},
+					Resource: "tasks/local/doing/0002 - WIP",
 				},
 			},
 		},

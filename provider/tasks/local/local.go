@@ -130,6 +130,8 @@ func (p LocalTaskProvider) List() ([]item.Item, error) {
 					"Status": status.Name(),
 					"IsDir":  boolToYesNo(task.IsDir()),
 				},
+				// TODO: it feels like this is duplicate code
+				Resource: filepath.Join(p.Entrypoint, status.Name(), task.Name()),
 			})
 		}
 	}

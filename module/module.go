@@ -25,8 +25,16 @@ type Module struct {
 	Providers map[string]provider.Provider
 }
 
-func (m Module) ListItems() []item.Item {
-	return []item.Item{}
+func (m Module) ListItems() ([]item.Item, error) {
+	var items []item.Item
+	for _, prv := range m.Providers {
+		list, err := prv.List()
+		if err != nil {
+			return items, err
+		}
+		items = append(items, list...)
+	}
+	return items, nil
 }
 
 func (m Module) OpenItem(item item.Item) error {
