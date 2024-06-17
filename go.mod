@@ -6,7 +6,7 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/manifoldco/promptui v0.9.0
 	github.com/otiai10/copy v1.14.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.18.2
 )
 
