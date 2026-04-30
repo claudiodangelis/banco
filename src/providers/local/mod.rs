@@ -1,0 +1,61 @@
+mod bookmarks;
+mod notes;
+mod repos;
+mod tasks;
+mod util;
+
+use std::path::Path;
+
+use crate::dump::ModuleDump;
+use crate::module::Module;
+use crate::provider::Provider;
+
+pub struct LocalProvider {
+    modules: Vec<Box<dyn Module>>,
+}
+
+impl LocalProvider {
+    pub fn new() -> Self {
+        Self {
+            modules: vec![Box::new(notes::Notes), Box::new(tasks::Tasks), Box::new(bookmarks::Bookmarks), Box::new(repos::Repos)],
+        }
+    }
+
+    pub fn find_module(&self, cli_name: &str) -> Option<&dyn Module> {
+        self.modules.iter().find(|m| m.cli_name() == cli_name).map(|m| m.as_ref())
+    }
+
+    pub fn all_template_paths(&self, root: &Path) -> Vec<String> {
+        self.modules.iter().flat_map(|m| m.template_paths(root)).collect()
+    }
+
+    pub fn module_descriptions(&self) -> Vec<String> {
+        self.modules.iter().map(|m| m.describe()).collect()
+    }
+}
+
+impl Provider for LocalProvider {
+    fn name(&self) -> &str {
+        "local"
+    }
+
+    fn init(&self, root: &Path) -> anyhow::Result<()> {
+        for module in &self.modules {
+            module.init(root)?;
+        }
+        Ok(())
+    }
+
+    fn dump(&self, root: &Path) -> anyhow::Result<Vec<ModuleDump>> {
+        self.modules
+            .iter()
+            .map(|m| {
+                Ok(ModuleDump {
+                    name: m.name().to_string(),
+                    parameters: m.parameters(),
+                    items: m.dump(root)?,
+                })
+            })
+            .collect()
+    }
+}
