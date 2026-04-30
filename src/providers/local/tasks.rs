@@ -9,7 +9,7 @@ use super::util::find_template;
 
 pub struct Tasks;
 
-const STATUSES: &[&str] = &["awaiting", "doing", "done"];
+const STATUSES: &[&str] = &["backlog", "doing", "done"];
 
 fn next_task_number(root: &Path) -> u32 {
     let base = root.join("tasks/local");
@@ -43,7 +43,7 @@ impl Module for Tasks {
 ## tasks/local/
 Tasks are stored here as markdown files, organized by status:
 
-- `awaiting/` — tasks waiting to be started
+- `backlog/` — tasks waiting to be started
 - `doing/`    — tasks currently in progress
 - `done/`     — completed tasks\
 "
@@ -71,7 +71,7 @@ Tasks are stored here as markdown files, organized by status:
     }
 
     fn create(&self, root: &Path, name: &str, params: &HashMap<String, String>) -> anyhow::Result<()> {
-        let status = params.get("status").map(|s| s.as_str()).unwrap_or("awaiting");
+        let status = params.get("status").map(|s| s.as_str()).unwrap_or("backlog");
         if !STATUSES.contains(&status) {
             anyhow::bail!("invalid status '{}'; must be one of: {}", status, STATUSES.join(", "));
         }

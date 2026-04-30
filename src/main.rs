@@ -43,7 +43,7 @@ Use `banco new <module>` to create a new item. The `-n` flag sets the name and `
 # Create a note\n\
 banco new note -n \"My note\" -p \"label=meetings\"\n\n\
 # Create a task\n\
-banco new task -n \"Fix login bug\" -p \"status=awaiting\"\n\n\
+banco new task -n \"Fix login bug\" -p \"status=backlog\"\n\n\
 # Create a bookmark\n\
 banco new bookmark -n \"Rust book\" -p \"label=tools/rust\" -p \"url=https://doc.rust-lang.org/book/\"\n\n\
 # Create a local repository (initialized as a git repo)\n\
