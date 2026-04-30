@@ -15,12 +15,12 @@ pub struct ProviderContext {
 #[derive(Serialize)]
 pub struct ModuleContext {
     pub name: String,
-    pub parameters: Vec<Param>,
+    pub labels: Vec<Label>,
     pub items: Vec<serde_json::Value>,
 }
 
 #[derive(Serialize)]
-pub struct Param {
+pub struct Label {
     pub name: String,
     #[serde(rename = "type")]
     pub kind: String,

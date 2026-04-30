@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde_json::{json, Value};
 
-use crate::context::Param;
+use crate::context::Label;
 use crate::module::Module;
 use super::util::find_template;
 
@@ -50,8 +50,8 @@ Tasks are stored here as markdown files, organized by status:
         .to_string()
     }
 
-    fn parameters(&self) -> Vec<Param> {
-        vec![Param {
+    fn labels(&self) -> Vec<Label> {
+        vec![Label {
             name: "status".to_string(),
             kind: "enum".to_string(),
             description: "Status of the task".to_string(),

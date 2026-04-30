@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde_json::{json, Value};
 
-use crate::context::Param;
+use crate::context::Label;
 use crate::module::Module;
 
 pub struct Repos;
@@ -29,7 +29,7 @@ those may be a better fit for repositories hosted on a remote platform.\
         .to_string()
     }
 
-    fn parameters(&self) -> Vec<Param> {
+    fn labels(&self) -> Vec<Label> {
         vec![]
     }
 

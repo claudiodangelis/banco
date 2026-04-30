@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 
-use crate::context::Param;
+use crate::context::Label;
 
-pub fn prompt(parameters: &[Param]) -> anyhow::Result<(String, HashMap<String, String>)> {
+pub fn prompt(labels: &[Label]) -> anyhow::Result<(String, HashMap<String, String>)> {
     let theme = ColorfulTheme::default();
 
     let name: String = Input::with_theme(&theme)
@@ -12,7 +12,7 @@ pub fn prompt(parameters: &[Param]) -> anyhow::Result<(String, HashMap<String, S
         .interact_text()?;
 
     let mut params = HashMap::new();
-    for param in parameters {
+    for param in labels {
         match param.kind.as_str() {
             "string" => {
                 let value: String = Input::with_theme(&theme)

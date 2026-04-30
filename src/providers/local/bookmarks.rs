@@ -4,7 +4,7 @@ use std::path::Path;
 use serde_json::{json, Value};
 use walkdir::WalkDir;
 
-use crate::context::Param;
+use crate::context::Label;
 use crate::module::Module;
 use super::util::{find_template, label_template_paths};
 
@@ -28,15 +28,15 @@ Subdirectories act as labels/tags and can be nested.\
         .to_string()
     }
 
-    fn parameters(&self) -> Vec<Param> {
+    fn labels(&self) -> Vec<Label> {
         vec![
-            Param {
+            Label {
                 name: "label".to_string(),
                 kind: "string".to_string(),
                 description: "Optional nested path used as a tag (e.g. tools/rust)".to_string(),
                 values: None,
             },
-            Param {
+            Label {
                 name: "url".to_string(),
                 kind: "string".to_string(),
                 description: "URL of the bookmarked resource".to_string(),

@@ -17,12 +17,12 @@ use context::{ContextOutput, ProviderContext};
 use provider::Provider;
 use providers::local::LocalProvider;
 
-fn parse_params(raw: &[String]) -> anyhow::Result<HashMap<String, String>> {
+fn parse_labels(raw: &[String]) -> anyhow::Result<HashMap<String, String>> {
     raw.iter()
         .map(|p| {
             p.split_once('=')
                 .map(|(k, v)| (k.to_string(), v.to_string()))
-                .ok_or_else(|| anyhow::anyhow!("invalid param '{}': expected key=value", p))
+                .ok_or_else(|| anyhow::anyhow!("invalid label '{}': expected key=value", p))
         })
         .collect()
 }
@@ -38,18 +38,18 @@ Banco is an open-source project management tool for the command line: https://gi
 ## banco context\n\n\
 Run `banco context` to get a JSON summary of the project state (notes, tasks, repos, etc.).\n\n\
 ## banco new\n\n\
-Use `banco new <module>` to create a new item. The `-n` flag sets the name and `-p` sets a parameter as `key=value`.\n\n\
+Use `banco new <module>` to create a new item. The `-n` flag sets the name and `-l` sets a label as `key=value`.\n\n\
 ```sh\n\
 # Create a note\n\
-banco new note -n \"My note\" -p \"label=meetings\"\n\n\
+banco new note -n \"My note\" -l \"label=meetings\"\n\n\
 # Create a task\n\
-banco new task -n \"Fix login bug\" -p \"status=backlog\"\n\n\
+banco new task -n \"Fix login bug\" -l \"status=backlog\"\n\n\
 # Create a bookmark\n\
-banco new bookmark -n \"Rust book\" -p \"label=tools/rust\" -p \"url=https://doc.rust-lang.org/book/\"\n\n\
+banco new bookmark -n \"Rust book\" -l \"label=tools/rust\" -l \"url=https://doc.rust-lang.org/book/\"\n\n\
 # Create a local repository (initialized as a git repo)\n\
 banco new repo -n \"my-project\"\n\
 ```\n\n\
-Available modules and their parameters are listed in the `parameters` field of `banco context`.\n",
+Available modules and their labels are listed in the `labels` field of `banco context`.\n",
         descriptions.join("\n\n")
     );
     std::fs::write(root.join("AGENTS.md"), agents_md)?;
@@ -80,16 +80,16 @@ fn main() -> anyhow::Result<()> {
             write_agent_files(&root, &local)?;
             println!("Initialized banco in {}", root.display());
         }
-        Commands::New { module, name, params } => {
+        Commands::New { module, name, labels } => {
             let m = local
                 .find_module(&module)
                 .ok_or_else(|| anyhow::anyhow!("unknown module '{}'; available: note, task", module))?;
 
-            let (item_name, item_params) = if name.is_none() && params.is_empty() {
-                tui::prompt(&m.parameters())?
+            let (item_name, item_params) = if name.is_none() && labels.is_empty() {
+                tui::prompt(&m.labels())?
             } else {
                 let n = name.ok_or_else(|| anyhow::anyhow!("-n/--name is required"))?;
-                (n, parse_params(&params)?)
+                (n, parse_labels(&labels)?)
             };
 
             m.create(&root, &item_name, &item_params)?;

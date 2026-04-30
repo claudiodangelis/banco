@@ -52,7 +52,7 @@ impl Provider for LocalProvider {
             .map(|m| {
                 Ok(ModuleContext {
                     name: m.name().to_string(),
-                    parameters: m.parameters(),
+                    labels: m.labels(),
                     items: m.context(root)?,
                 })
             })

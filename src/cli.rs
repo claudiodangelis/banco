@@ -22,9 +22,9 @@ pub enum Commands {
         /// Item name
         #[arg(short = 'n', long)]
         name: Option<String>,
-        /// Parameter in key=value format (repeatable)
-        #[arg(short = 'p', long = "param")]
-        params: Vec<String>,
+        /// Label in key=value format (repeatable)
+        #[arg(short = 'l', long = "label")]
+        labels: Vec<String>,
     },
     /// Create or edit a template (interactive)
     Template,
