@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use crate::dump::ModuleDump;
+use crate::context::ModuleContext;
 
 pub trait Provider {
     fn name(&self) -> &str;
     fn init(&self, root: &Path) -> anyhow::Result<()>;
-    fn dump(&self, root: &Path) -> anyhow::Result<Vec<ModuleDump>>;
+    fn context(&self, root: &Path) -> anyhow::Result<Vec<ModuleContext>>;
 }

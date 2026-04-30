@@ -6,7 +6,7 @@ mod util;
 
 use std::path::Path;
 
-use crate::dump::ModuleDump;
+use crate::context::ModuleContext;
 use crate::module::Module;
 use crate::provider::Provider;
 
@@ -46,14 +46,14 @@ impl Provider for LocalProvider {
         Ok(())
     }
 
-    fn dump(&self, root: &Path) -> anyhow::Result<Vec<ModuleDump>> {
+    fn context(&self, root: &Path) -> anyhow::Result<Vec<ModuleContext>> {
         self.modules
             .iter()
             .map(|m| {
-                Ok(ModuleDump {
+                Ok(ModuleContext {
                     name: m.name().to_string(),
                     parameters: m.parameters(),
-                    items: m.dump(root)?,
+                    items: m.context(root)?,
                 })
             })
             .collect()

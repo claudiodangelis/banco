@@ -1,19 +1,19 @@
 use serde::Serialize;
 
 #[derive(Serialize)]
-pub struct DumpOutput {
+pub struct ContextOutput {
     pub project: String,
-    pub providers: Vec<ProviderDump>,
+    pub providers: Vec<ProviderContext>,
 }
 
 #[derive(Serialize)]
-pub struct ProviderDump {
+pub struct ProviderContext {
     pub name: String,
-    pub modules: Vec<ModuleDump>,
+    pub modules: Vec<ModuleContext>,
 }
 
 #[derive(Serialize)]
-pub struct ModuleDump {
+pub struct ModuleContext {
     pub name: String,
     pub parameters: Vec<Param>,
     pub items: Vec<serde_json::Value>,

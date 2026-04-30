@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 
-use crate::dump::Param;
+use crate::context::Param;
 
 pub fn prompt(parameters: &[Param]) -> anyhow::Result<(String, HashMap<String, String>)> {
     let theme = ColorfulTheme::default();

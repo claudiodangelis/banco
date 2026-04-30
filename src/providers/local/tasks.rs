@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde_json::{json, Value};
 
-use crate::dump::Param;
+use crate::context::Param;
 use crate::module::Module;
 use super::util::find_template;
 
@@ -82,7 +82,7 @@ Tasks are stored here as markdown files, organized by status:
         Ok(())
     }
 
-    fn dump(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
+    fn context(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
         let base = root.join("tasks/local");
         if !base.exists() {
             return Ok(vec![]);

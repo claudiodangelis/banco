@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde_json::{json, Value};
 
-use crate::dump::Param;
+use crate::context::Param;
 use crate::module::Module;
 
 pub struct Repos;
@@ -56,7 +56,7 @@ those may be a better fit for repositories hosted on a remote platform.\
         Ok(())
     }
 
-    fn dump(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
+    fn context(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
         let base = root.join("repos/local");
         if !base.exists() {
             return Ok(vec![]);

@@ -4,7 +4,7 @@ use std::path::Path;
 use serde_json::{json, Value};
 use walkdir::WalkDir;
 
-use crate::dump::Param;
+use crate::context::Param;
 use crate::module::Module;
 use super::util::{find_template, label_template_paths};
 
@@ -73,7 +73,7 @@ Subdirectories act as labels/tags and can be nested.\
         Ok(())
     }
 
-    fn dump(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
+    fn context(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
         let base = root.join("bookmarks/local");
         if !base.exists() {
             return Ok(vec![]);

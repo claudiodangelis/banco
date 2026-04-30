@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::dump::Param;
+use crate::context::Param;
 
 pub trait Module {
     fn name(&self) -> &str;
@@ -11,5 +11,5 @@ pub trait Module {
     fn template_paths(&self, root: &Path) -> Vec<String>;
     fn init(&self, root: &Path) -> anyhow::Result<()>;
     fn create(&self, root: &Path, name: &str, params: &HashMap<String, String>) -> anyhow::Result<()>;
-    fn dump(&self, root: &Path) -> anyhow::Result<Vec<serde_json::Value>>;
+    fn context(&self, root: &Path) -> anyhow::Result<Vec<serde_json::Value>>;
 }

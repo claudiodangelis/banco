@@ -1,5 +1,5 @@
 mod cli;
-mod dump;
+mod context;
 mod module;
 mod provider;
 mod providers;
@@ -13,7 +13,7 @@ use dialoguer::theme::ColorfulTheme;
 use clap::Parser;
 
 use cli::{Cli, Commands};
-use dump::{DumpOutput, ProviderDump};
+use context::{ContextOutput, ProviderContext};
 use provider::Provider;
 use providers::local::LocalProvider;
 
@@ -49,7 +49,7 @@ banco new bookmark -n \"Rust book\" -p \"label=tools/rust\" -p \"url=https://doc
 # Create a local repository (initialized as a git repo)\n\
 banco new repo -n \"my-project\"\n\
 ```\n\n\
-Available modules and their parameters are listed in the `parameters` field of `banco dump`.\n",
+Available modules and their parameters are listed in the `parameters` field of `banco context`.\n",
         descriptions.join("\n\n")
     );
     std::fs::write(root.join("AGENTS.md"), agents_md)?;
@@ -119,11 +119,11 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::Context => {
             let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-            let output = DumpOutput {
+            let output = ContextOutput {
                 project,
-                providers: vec![ProviderDump {
+                providers: vec![ProviderContext {
                     name: local.name().to_string(),
-                    modules: local.dump(&root)?,
+                    modules: local.context(&root)?,
                 }],
             };
             println!("{}", serde_json::to_string_pretty(&output)?);
