@@ -92,8 +92,9 @@ fn main() -> anyhow::Result<()> {
                 (n, parse_labels(&labels)?)
             };
 
-            m.create(&root, &item_name, &item_params)?;
-            println!("Created {} '{}'", module, item_name);
+            let path = m.create(&root, &item_name, &item_params)?;
+            let rel = path.strip_prefix(&root).unwrap_or(&path);
+            println!("Created {} '{}': {}", module, item_name, rel.display());
         }
         Commands::Template => {
             let paths = local.all_template_paths(&root);

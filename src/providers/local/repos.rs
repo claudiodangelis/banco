@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 
@@ -42,7 +42,7 @@ those may be a better fit for repositories hosted on a remote platform.\
         Ok(())
     }
 
-    fn create(&self, root: &Path, name: &str, _params: &HashMap<String, String>) -> anyhow::Result<()> {
+    fn create(&self, root: &Path, name: &str, _params: &HashMap<String, String>) -> anyhow::Result<PathBuf> {
         let repo_path = root.join("repos/local").join(name);
         std::fs::create_dir_all(&repo_path)?;
         let status = std::process::Command::new("git")
@@ -53,7 +53,7 @@ those may be a better fit for repositories hosted on a remote platform.\
         if !status.success() {
             anyhow::bail!("git init failed in {}", repo_path.display());
         }
-        Ok(())
+        Ok(repo_path)
     }
 
     fn context(&self, root: &Path) -> anyhow::Result<Vec<Value>> {

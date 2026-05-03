@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 use walkdir::WalkDir;
@@ -46,7 +46,7 @@ Subdirectories act as labels/tags and can be nested.\
         Ok(())
     }
 
-    fn create(&self, root: &Path, name: &str, params: &HashMap<String, String>) -> anyhow::Result<()> {
+    fn create(&self, root: &Path, name: &str, params: &HashMap<String, String>) -> anyhow::Result<PathBuf> {
         let label = params.get("label").map(|s| s.as_str()).unwrap_or("");
         let dir = if label.is_empty() {
             root.join("notes/local")
@@ -54,9 +54,10 @@ Subdirectories act as labels/tags and can be nested.\
             root.join("notes/local").join(label)
         };
         std::fs::create_dir_all(&dir)?;
+        let path = dir.join(format!("{}.md", name));
         let content = find_template(root, "notes/local", label).unwrap_or_default();
-        std::fs::write(dir.join(format!("{}.md", name)), content)?;
-        Ok(())
+        std::fs::write(&path, content)?;
+        Ok(path)
     }
 
     fn context(&self, root: &Path) -> anyhow::Result<Vec<Value>> {

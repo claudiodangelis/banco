@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 
@@ -70,16 +70,17 @@ Tasks are stored here as markdown files, organized by status:
         Ok(())
     }
 
-    fn create(&self, root: &Path, name: &str, params: &HashMap<String, String>) -> anyhow::Result<()> {
+    fn create(&self, root: &Path, name: &str, params: &HashMap<String, String>) -> anyhow::Result<PathBuf> {
         let status = params.get("status").map(|s| s.as_str()).unwrap_or("backlog");
         if !STATUSES.contains(&status) {
             anyhow::bail!("invalid status '{}'; must be one of: {}", status, STATUSES.join(", "));
         }
         let next = next_task_number(root);
         let dir = root.join("tasks/local").join(status);
+        let path = dir.join(format!("{:04} - {}.md", next, name));
         let content = find_template(root, "tasks/local", "").unwrap_or_default();
-        std::fs::write(dir.join(format!("{:04} - {}.md", next, name)), content)?;
-        Ok(())
+        std::fs::write(&path, content)?;
+        Ok(path)
     }
 
     fn context(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
