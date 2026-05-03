@@ -43,6 +43,6 @@ pub fn prompt(labels: &[Label]) -> anyhow::Result<(String, HashMap<String, Strin
 pub fn confirm_open(editor: &str) -> anyhow::Result<bool> {
     Ok(dialoguer::Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt(format!("Open in {}?", editor))
-        .default(false)
+        .default(true)
         .interact()?)
 }
