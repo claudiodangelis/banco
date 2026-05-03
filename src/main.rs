@@ -85,7 +85,8 @@ fn main() -> anyhow::Result<()> {
                 .find_module(&module)
                 .ok_or_else(|| anyhow::anyhow!("unknown module '{}'; available: note, task", module))?;
 
-            let (item_name, item_params) = if name.is_none() && labels.is_empty() {
+            let tui_mode = name.is_none() && labels.is_empty();
+            let (item_name, item_params) = if tui_mode {
                 tui::prompt(&m.labels())?
             } else {
                 let n = name.ok_or_else(|| anyhow::anyhow!("-n/--name is required"))?;
@@ -95,6 +96,17 @@ fn main() -> anyhow::Result<()> {
             let path = m.create(&root, &item_name, &item_params)?;
             let rel = path.strip_prefix(&root).unwrap_or(&path);
             println!("Created {} '{}': {}", module, item_name, rel.display());
+
+            if tui_mode {
+                if let Ok(editor) = std::env::var("EDITOR") {
+                    if path.is_file() && tui::confirm_open(&editor)? {
+                        std::process::Command::new(&editor)
+                            .arg(&path)
+                            .status()
+                            .with_context(|| format!("failed to launch editor '{}'", editor))?;
+                    }
+                }
+            }
         }
         Commands::Template => {
             let paths = local.all_template_paths(&root);
