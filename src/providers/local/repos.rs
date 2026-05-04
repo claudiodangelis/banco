@@ -56,6 +56,22 @@ those may be a better fit for repositories hosted on a remote platform.\
         Ok(repo_path)
     }
 
+    fn list(&self, root: &Path) -> anyhow::Result<Vec<(String, PathBuf)>> {
+        let base = root.join("repos/local");
+        if !base.exists() {
+            return Ok(vec![]);
+        }
+        let mut items = Vec::new();
+        for entry in std::fs::read_dir(&base)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                items.push((name, path));
+            }
+        }
+        Ok(items)
+    }
+
     fn context(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
         let base = root.join("repos/local");
         if !base.exists() {

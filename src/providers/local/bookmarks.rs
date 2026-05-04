@@ -74,6 +74,23 @@ Subdirectories act as labels/tags and can be nested.\
         Ok(path)
     }
 
+    fn list(&self, root: &Path) -> anyhow::Result<Vec<(String, PathBuf)>> {
+        let base = root.join("bookmarks/local");
+        if !base.exists() {
+            return Ok(vec![]);
+        }
+        let mut items = Vec::new();
+        for entry in WalkDir::new(&base).min_depth(1).into_iter().filter_map(|e| e.ok()) {
+            let path = entry.path().to_path_buf();
+            if path.is_file() && path.extension().map_or(false, |e| e == "md") {
+                let rel = path.strip_prefix(&base).unwrap_or(&path);
+                let label = rel.to_string_lossy().trim_end_matches(".md").to_string();
+                items.push((label, path));
+            }
+        }
+        Ok(items)
+    }
+
     fn context(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
         let base = root.join("bookmarks/local");
         if !base.exists() {

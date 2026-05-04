@@ -25,6 +25,10 @@ impl LocalProvider {
         self.modules.iter().find(|m| m.cli_name() == cli_name).map(|m| m.as_ref())
     }
 
+    pub fn modules(&self) -> &[Box<dyn Module>] {
+        &self.modules
+    }
+
     pub fn all_template_paths(&self, root: &Path) -> Vec<String> {
         self.modules.iter().flat_map(|m| m.template_paths(root)).collect()
     }

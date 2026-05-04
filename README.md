@@ -106,12 +106,13 @@ Banco supports the following commands:
 
 - init
 - new
+- edit
 - template
 - context
 
 ## init
 
-Run `banco init` in an empty directory to set up a new banco project. Banco creates the directory skeleton for each module (e.g. `tasks/local/awaiting`, `tasks/local/doing`, `tasks/local/done`) and generates `CLAUDE.md` and `AGENTS.md` for agentic workflows.
+Run `banco init` in an empty directory to set up a new banco project. Banco creates the directory skeleton for each module (e.g. `tasks/local/backlog`, `tasks/local/doing`, `tasks/local/done`) and generates `CLAUDE.md` and `AGENTS.md` for agentic workflows.
 
 If a new provider is enabled after initialization, run `banco init --update` to update the project structure.
 
@@ -120,12 +121,24 @@ If a new provider is enabled after initialization, run `banco init --update` to 
 If a module has the "new" capability, you can use the command line to create a new item:
 
 ```sh
-banco new note -p 'label=some/nested/path' -n 'My note'
+banco new note -l 'label=some/nested/path' -n 'My note'
 ```
 
-Pass `-n` for the item name and `-p key=value` for each parameter. Run without flags to use the interactive TUI, which prompts for all required parameters.
+Pass `-n` for the item name and `-l key=value` for each label. Run without flags to use the interactive TUI, which prompts for all required fields and offers to open the new item in `$EDITOR` when done.
 
-When passing a value for an `enum` parameter via `-p`, the value must be one of the allowed strings defined by the module. Passing an invalid value will cause the command to fail with an error.
+When passing a value for an `enum` label via `-l`, the value must be one of the allowed strings defined by the module. Passing an invalid value will cause the command to fail with an error.
+
+## edit
+
+Opens an existing item in `$EDITOR`. Requires `$EDITOR` to be set.
+
+```sh
+banco edit        # or: banco e
+banco edit note
+banco edit task
+```
+
+Without a module argument, banco first prompts you to pick a module. Then it presents a fuzzy-searchable list of all items in that module. Select one with the arrow keys or by typing to filter, and banco opens it in `$EDITOR`.
 
 ## template
 

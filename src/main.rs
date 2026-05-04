@@ -57,7 +57,7 @@ Available modules and their labels are listed in the `labels` field of `banco co
     Ok(())
 }
 
-fn main() -> anyhow::Result<()> {
+fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let root = std::env::current_dir().context("failed to get current directory")?;
     let local = LocalProvider::new();
@@ -108,6 +108,42 @@ fn main() -> anyhow::Result<()> {
                 }
             }
         }
+        Commands::Edit { module } => {
+            let editor = std::env::var("EDITOR")
+                .map_err(|_| anyhow::anyhow!("$EDITOR is not set"))?;
+
+            let m: &dyn module::Module = match module {
+                Some(ref name) => local
+                    .find_module(name)
+                    .ok_or_else(|| anyhow::anyhow!("unknown module '{}'", name))?,
+                None => {
+                    let modules = local.modules();
+                    let names: Vec<&str> = modules.iter().map(|m| m.cli_name()).collect();
+                    let idx = dialoguer::Select::with_theme(&ColorfulTheme::default())
+                        .with_prompt("Module")
+                        .items(&names)
+                        .default(0)
+                        .interact()?;
+                    modules[idx].as_ref()
+                }
+            };
+
+            let items = m.list(&root)?;
+            if items.is_empty() {
+                anyhow::bail!("no items found");
+            }
+            let labels: Vec<&str> = items.iter().map(|(l, _)| l.as_str()).collect();
+            let idx = dialoguer::FuzzySelect::with_theme(&ColorfulTheme::default())
+                .with_prompt("Item")
+                .items(&labels)
+                .default(0)
+                .interact()?;
+            let (_, path) = &items[idx];
+            std::process::Command::new(&editor)
+                .arg(path)
+                .status()
+                .with_context(|| format!("failed to launch editor '{}'", editor))?;
+        }
         Commands::Template => {
             let paths = local.all_template_paths(&root);
             if paths.is_empty() {
@@ -144,4 +180,23 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn main() {
+    ctrlc::set_handler(|| {
+        eprint!("\x1b[?25h");
+        std::process::exit(130);
+    })
+    .expect("failed to set Ctrl-C handler");
+
+    if let Err(e) = run() {
+        if let Some(io) = e.downcast_ref::<std::io::Error>() {
+            if io.kind() == std::io::ErrorKind::Interrupted {
+                eprint!("\x1b[?25h");
+                std::process::exit(130);
+            }
+        }
+        eprintln!("Error: {e:#}");
+        std::process::exit(1);
+    }
 }
