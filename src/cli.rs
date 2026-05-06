@@ -11,11 +11,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize banco in the current directory
-    Init {
-        /// Re-run initialization (e.g. after enabling new providers)
-        #[arg(long)]
-        update: bool,
-    },
+    Init,
     /// Create a new item
     New {
         /// Module name (note, task)

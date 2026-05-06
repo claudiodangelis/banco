@@ -10,7 +10,7 @@ The name "Banco" is a tribute to [Banco Del Mutuo Soccorso](http://www.progarchi
 
 Banco supports agentic workflows. Upon initialization, three files are created for agent context:
 
-- `.banco/BANCO.md` — banco-managed file explaining the project structure and available commands; updated on every `banco init --update`
+- `.banco/BANCO.md` — banco-managed file explaining the project structure and available commands; managed by banco
 - `AGENTS.md` — reads `.banco/BANCO.md` and is meant for user-defined instructions; never overwritten by banco
 - `CLAUDE.md` — reads `AGENTS.md`; never overwritten by banco
 
@@ -173,8 +173,6 @@ Banco supports the following commands:
 ## init
 
 Run `banco init` in an empty directory to set up a new banco project. Banco creates the directory skeleton for each module (e.g. `tasks/local/backlog`, `tasks/local/doing`, `tasks/local/done`) and generates `.banco/BANCO.md`, `AGENTS.md`, and `CLAUDE.md` for agentic workflows.
-
-If a new provider is enabled after initialization, run `banco init --update` to update the project structure.
 
 ## new
 

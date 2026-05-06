@@ -198,27 +198,21 @@ fn run() -> anyhow::Result<()> {
     let local = LocalProvider::new();
 
     match cli.command {
-        Commands::Init { update } => {
+        Commands::Init => {
             let banco_dir = root.join(".banco");
-            if update {
-                if !banco_dir.exists() {
-                    anyhow::bail!("not a banco project; run `banco init` first");
-                }
-            } else {
-                let is_empty = std::fs::read_dir(&root)?.next().is_none();
-                if !is_empty {
-                    anyhow::bail!("directory is not empty; use --update to re-run initialization");
-                }
-                std::fs::create_dir_all(&banco_dir)?;
-                config::save(&root, &config::ProjectConfig {
-                    providers: vec![config::ProviderEntry {
-                        name: "local".to_string(),
-                        alias: None,
-                        enabled: true,
-                        config: std::collections::HashMap::new(),
-                    }],
-                })?;
+            let is_empty = std::fs::read_dir(&root)?.next().is_none();
+            if !is_empty {
+                anyhow::bail!("directory is not empty");
             }
+            std::fs::create_dir_all(&banco_dir)?;
+            config::save(&root, &config::ProjectConfig {
+                providers: vec![config::ProviderEntry {
+                    name: "local".to_string(),
+                    alias: None,
+                    enabled: true,
+                    config: std::collections::HashMap::new(),
+                }],
+            })?;
             local.init(&root)?;
             write_agent_files(&root, &local)?;
             println!("Initialized banco in {}", root.display());
