@@ -8,7 +8,12 @@ The name "Banco" is a tribute to [Banco Del Mutuo Soccorso](http://www.progarchi
 
 ## Agents
 
-Banco supports agentic workflows. Upon initialization, an AGENTS.md file referenced by a CLAUDE.md file is created explaining all the directories.
+Banco supports agentic workflows. Upon initialization, three files are created for agent context:
+
+- `.banco/BANCO.md` — banco-managed file explaining the project structure and available commands; updated on every `banco init --update`
+- `AGENTS.md` — reads `.banco/BANCO.md` and is meant for user-defined instructions; never overwritten by banco
+- `CLAUDE.md` — reads `AGENTS.md`; never overwritten by banco
+
 Agents can make use of the `banco context` command to have an overview of the project state.
 
 Example prompts:
@@ -54,11 +59,9 @@ Provider configuration is stored in `.banco/config.yml` within the project direc
 └── tasks
     ├── gitlab
     │   └── my-project
-    │       └── development
-    │           ├── 1-open
-    │           │   └── 0042 - Fix login bug.md
-    │           ├── 2-to-do
-    │           └── 3-closed
+    │       ├── 1-open
+    │       │   └── 0042 - Fix login bug.md
+    │       └── 2-closed
     └── local
         ├── backlog
         │   └── 0003 - Write full specs.md
@@ -85,7 +88,9 @@ The local provider is enabled by default and added to `.banco/config.yml` automa
 
 ## gitlab
 
-The GitLab provider syncs tasks (issue boards) and repositories from configured GitLab projects into the local filesystem. Tasks are organized by board and column; repositories are cloned via SSH and kept up to date with `git fetch`.
+The GitLab provider syncs tasks (issues) and repositories from configured GitLab projects into
+the local filesystem. Issues are organized by open/closed state; repositories are cloned via SSH
+and kept up to date with `git fetch`.
 
 **Configuration parameters** (set interactively via `banco provider add`):
 
@@ -100,21 +105,16 @@ The GitLab provider syncs tasks (issue boards) and repositories from configured 
 
 **Directory structure:**
 
-Tasks are organized under `tasks/<provider>/` (where `<provider>` is the provider name or alias):
+Tasks are organized under `tasks/<provider>/`:
 
 ```
 tasks/
 └── gitlab/
     └── my-project/
-        └── development/        ← board name (slugified)
-            ├── 1-open/         ← open issues not assigned to any board column
-            │   └── 0042 - Fix login bug.md
-            ├── 2-to-do/        ← label-based column (slugified label name)
-            ├── 3-in-progress/
-            └── 4-closed/       ← closed issues
+        ├── 1-open/
+        │   └── 0042 - Fix login bug.md
+        └── 2-closed/
 ```
-
-Column directories are prefixed with their board position to preserve sort order. The prefix is zero-padded to the width of the total column count (e.g. `01-open`, `02-to-do` when there are 10 or more columns).
 
 Each task file contains the issue title and description:
 
@@ -171,7 +171,7 @@ Banco supports the following commands:
 
 ## init
 
-Run `banco init` in an empty directory to set up a new banco project. Banco creates the directory skeleton for each module (e.g. `tasks/local/backlog`, `tasks/local/doing`, `tasks/local/done`) and generates `CLAUDE.md` and `AGENTS.md` for agentic workflows.
+Run `banco init` in an empty directory to set up a new banco project. Banco creates the directory skeleton for each module (e.g. `tasks/local/backlog`, `tasks/local/doing`, `tasks/local/done`) and generates `.banco/BANCO.md`, `AGENTS.md`, and `CLAUDE.md` for agentic workflows.
 
 If a new provider is enabled after initialization, run `banco init --update` to update the project structure.
 

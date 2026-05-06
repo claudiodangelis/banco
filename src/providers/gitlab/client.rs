@@ -14,21 +14,6 @@ pub struct Project {
     pub ssh_url_to_repo: String,
 }
 
-#[derive(Deserialize)]
-pub struct Board {
-    pub id: u64,
-    pub name: String,
-}
-
-#[derive(Deserialize)]
-pub struct BoardList {
-    pub label: BoardLabel,
-}
-
-#[derive(Deserialize)]
-pub struct BoardLabel {
-    pub name: String,
-}
 
 #[derive(Deserialize)]
 pub struct Issue {
@@ -98,35 +83,13 @@ impl GitLabClient {
         Ok(resp.json()?)
     }
 
-    pub fn boards(&self, project_id: u64) -> anyhow::Result<Vec<Board>> {
-        self.get_paged(&format!("/projects/{}/boards", project_id), &[])
-    }
-
-    pub fn board_lists(&self, project_id: u64, board_id: u64) -> anyhow::Result<Vec<BoardList>> {
-        self.get_paged(
-            &format!("/projects/{}/boards/{}/lists", project_id, board_id),
-            &[],
-        )
-    }
-
-    /// Opened issues that don't belong to any of the given board list labels ("Open" column).
-    pub fn issues_opened(&self, project_id: u64, excluded_labels: &str) -> anyhow::Result<Vec<Issue>> {
-        let mut params: Vec<(&str, &str)> = vec![("state", "opened"), ("scope", "all")];
-        if !excluded_labels.is_empty() {
-            params.push(("not[labels]", excluded_labels));
-        }
-        self.get_paged(&format!("/projects/{}/issues", project_id), &params)
-    }
-
-    /// Opened issues with a specific label (label-based board column).
-    pub fn issues_by_label(&self, project_id: u64, label: &str) -> anyhow::Result<Vec<Issue>> {
+    pub fn issues_open(&self, project_id: u64) -> anyhow::Result<Vec<Issue>> {
         self.get_paged(
             &format!("/projects/{}/issues", project_id),
-            &[("state", "opened"), ("labels", label), ("scope", "all")],
+            &[("state", "opened"), ("scope", "all")],
         )
     }
 
-    /// All closed issues ("Closed" column).
     pub fn issues_closed(&self, project_id: u64) -> anyhow::Result<Vec<Issue>> {
         self.get_paged(
             &format!("/projects/{}/issues", project_id),
