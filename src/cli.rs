@@ -26,15 +26,27 @@ pub enum Commands {
         #[arg(short = 'l', long = "label")]
         labels: Vec<String>,
     },
-    /// Open an existing item in $EDITOR (interactive)
-    #[command(alias = "e")]
-    Edit {
-        /// Module name (note, task, bookmark, repo)
-        module: Option<String>,
-    },
     /// Create or edit a template (interactive)
     Template,
     /// Output a JSON summary of the project state (intended for agents)
     #[command(alias = "ctx")]
     Context,
+    /// Manage providers
+    Provider {
+        #[command(subcommand)]
+        action: ProviderAction,
+    },
+    /// Sync configured providers
+    Sync {
+        /// Provider name or alias to sync (syncs all if omitted)
+        provider: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ProviderAction {
+    /// Add a new provider (interactive)
+    Add,
+    /// List configured providers
+    List,
 }

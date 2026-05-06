@@ -2,8 +2,24 @@ use std::path::Path;
 
 use crate::context::ModuleContext;
 
+pub struct ConfigParam {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub kind: ConfigParamKind,
+    pub required: bool,
+}
+
+pub enum ConfigParamKind {
+    String,
+    List,
+}
+
 pub trait Provider {
     fn name(&self) -> &str;
     fn init(&self, root: &Path) -> anyhow::Result<()>;
     fn context(&self, root: &Path) -> anyhow::Result<Vec<ModuleContext>>;
+
+    fn sync(&self, _root: &Path) -> anyhow::Result<()> {
+        Ok(())
+    }
 }

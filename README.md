@@ -31,39 +31,37 @@ cargo install --path .
 
 In banco, everything is a file and files are organized in structured directories.
 Items (notes, tasks, bookmarks, etc.) are grouped in modules and provided by providers.
-One default provider exists, called "local".
-When running a banco command, if no provider is specified, the local provider is used.
-
-For each module, the default provider can be configured — for example, you can use the JIRA provider as the default provider for tasks.
+The local provider is built in and enabled by default.
 You can use aliases when using the same provider multiple times.
 
-Here is how a project managed by Banco looks on the filesystem:
+Provider configuration is stored in `.banco/config.yml` within the project directory. Each provider entry supports a common `enabled` field (default: `true`) — set it to `false` to disable a provider without removing its configuration. Here is how a project managed by Banco looks on the filesystem:
 
 ```
+├── .banco
+│   └── config.yml              ← provider configuration
 ├── notes
-│   └── local
-│       ├── meetings
-│       │   ├── 20260101 Kickstart meeting.md
-│       │   └── 20260102 Client call.md
-│       └── project-requirements.md
+│   └── local
+│       ├── meetings
+│       │   ├── 20260101 Kickstart meeting.md
+│       │   └── 20260102 Client call.md
+│       └── project-requirements.md
 ├── repos
-│   ├── github
-│   │   ├── frontend
-│   │   └── backend
-│   └── local
-│       ├── poc
-│       └── mvp
+│   ├── gitlab
+│   │   └── my-project          ← cloned via SSH
+│   └── local
+│       ├── poc
+│       └── mvp
 └── tasks
-    ├── jira
-    │   ├── MYPROJECT-0001 Implement MVP
-    │   │   └── MYPROJECT-0001.md
-    │   └── MYPROJECT-0002 Assess network requirements
-    │       ├── client-config.md
-    │       ├── diagram.graphml
-    │       └── MYPROJECT-0002.md
+    ├── gitlab
+    │   └── my-project
+    │       └── development
+    │           ├── 1-open
+    │           │   └── 0042 - Fix login bug.md
+    │           ├── 2-to-do
+    │           └── 3-closed
     └── local
-        ├── awaiting
-        │   └── 0003 - Write full specs.md
+        ├── backlog
+        │   └── 0003 - Write full specs.md
         ├── doing
         └── done
             ├── 0001 - Schedule kickstart meeting.md
@@ -78,18 +76,18 @@ Here is how a project managed by Banco looks on the filesystem:
 |          | tasks     |           |
 |          | bookmarks |           |
 |          | repos     |           |
+| gitlab   | tasks     | available |
+|          | repos     |           |
 | jira     | tasks     | planned   |
 | github   | tasks     | planned   |
 |          | repos     |           |
-| gitlab   | repos     | planned   |
-|          | tasks     |           |
 | gerrit   | repos     | planned   |
 
 # Providers
 
 ## local
 
-Items provided by the local provider are not synchronized with any external service — they are plain files and directories on your filesystem, managed entirely by you.
+The local provider is enabled by default and added to `.banco/config.yml` automatically on `banco init`. Items are not synchronized with any external service — they are plain files and directories on your filesystem, managed entirely by you.
 
 | Module    | Directory          | Items                             | Parameters                                                                 |
 | --------- | ------------------ | --------------------------------- | -------------------------------------------------------------------------- |
@@ -98,7 +96,50 @@ Items provided by the local provider are not synchronized with any external serv
 | bookmarks | `bookmarks/local/` | Markdown files                    | `label` (string, optional — nested tag, e.g. `tools/rust`), `url` (string) |
 | repos     | `repos/local/`     | Directories, `git init` on create | —                                                                          |
 
-> **Note:** GitHub, GitLab, and Gerrit providers are planned and will be available soon — those may be a better fit for repositories hosted on a remote platform.
+> **Note:** GitHub and Gerrit providers are planned and will be available soon — those may be a better fit for repositories hosted on a remote platform.
+
+## gitlab
+
+The GitLab provider syncs tasks (issue boards) and repositories from configured GitLab projects into the local filesystem. Tasks are organized by board and column; repositories are cloned via SSH and kept up to date with `git fetch`.
+
+**Configuration parameters** (set interactively via `banco provider add`):
+
+| Parameter          | Required | Description                                                   |
+| ------------------ | -------- | ------------------------------------------------------------- |
+| `api_key`          | yes      | GitLab personal access token                                  |
+| `host`             | no       | GitLab instance URL (default: `https://gitlab.com`)           |
+| `projects`         | no†      | Explicit list of project paths in `namespace/project` format  |
+| `projects_pattern` | no†      | Regex matched against `namespace/project` — e.g. `mygroup/.*` |
+
+† Exactly one of `projects` or `projects_pattern` must be set; they are mutually exclusive.
+
+**Directory structure:**
+
+Tasks are organized under `tasks/<provider>/` (where `<provider>` is the provider name or alias):
+
+```
+tasks/
+└── gitlab/
+    └── my-project/
+        └── development/        ← board name (slugified)
+            ├── 1-open/         ← open issues not assigned to any board column
+            │   └── 0042 - Fix login bug.md
+            ├── 2-to-do/        ← label-based column (slugified label name)
+            ├── 3-in-progress/
+            └── 4-closed/       ← closed issues
+```
+
+Column directories are prefixed with their board position to preserve sort order. The prefix is zero-padded to the width of the total column count (e.g. `01-open`, `02-to-do` when there are 10 or more columns).
+
+Each task file contains the issue title and description:
+
+```markdown
+# Fix login bug
+
+Description here...
+```
+
+Repos from configured projects are cloned under `repos/<provider>/`.
 
 # Commands
 
@@ -106,9 +147,10 @@ Banco supports the following commands:
 
 - init
 - new
-- edit
 - template
 - context
+- provider
+- sync
 
 ## init
 
@@ -127,18 +169,6 @@ banco new note -l 'label=some/nested/path' -n 'My note'
 Pass `-n` for the item name and `-l key=value` for each label. Run without flags to use the interactive TUI, which prompts for all required fields and offers to open the new item in `$EDITOR` when done.
 
 When passing a value for an `enum` label via `-l`, the value must be one of the allowed strings defined by the module. Passing an invalid value will cause the command to fail with an error.
-
-## edit
-
-Opens an existing item in `$EDITOR`. Requires `$EDITOR` to be set.
-
-```sh
-banco edit        # or: banco e
-banco edit note
-banco edit task
-```
-
-Without a module argument, banco first prompts you to pick a module. Then it presents a fuzzy-searchable list of all items in that module. Select one with the arrow keys or by typing to filter, and banco opens it in `$EDITOR`.
 
 ## template
 
@@ -160,32 +190,76 @@ banco context  # or: banco ctx
 
 ```json
 {
-    "project": "name of the dir",
-    "providers": [
+  "project": "name of the dir",
+  "providers": [
+    {
+      "name": "local",
+      "modules": [
         {
-            "name": "local",
-            "modules": [
-                {
-                    "name": "notes",
-                    "parameters": [
-                        {
-                            "name": "label",
-                            "type": "string",
-                            "description": "Optional nested path used as a tag (e.g. meetings/2026)"
-                        }
-                    ],
-                    "items": [
-                        {
-                            "name": "My first note",
-                            "label": "meetings"
-                        }
-                    ]
-                }
-            ]
+          "name": "notes",
+          "parameters": [
+            {
+              "name": "label",
+              "type": "string",
+              "description": "Optional nested path used as a tag (e.g. meetings/2026)"
+            }
+          ],
+          "items": [
+            {
+              "name": "My first note",
+              "label": "meetings"
+            }
+          ]
         }
-    ]
+      ]
+    }
+  ]
 }
 ```
+
+## provider
+
+Manages providers configured for the current project. Provider configuration is stored in `.banco/config.yml`.
+
+```sh
+banco provider add   # add a new provider (interactive)
+banco provider list  # list configured providers
+```
+
+### provider add
+
+Presents a list of available providers to choose from. After selecting one, you are prompted for an optional alias — an alias is required if a provider of the same kind is already configured. Banco then walks through each configuration parameter for the chosen provider and saves the result to `.banco/config.yml`.
+
+### provider list
+
+Prints the name (or alias) of each configured provider.
+
+## sync
+
+Pulls data from configured remote providers and writes it to the local filesystem.
+
+```sh
+banco sync              # sync all configured providers
+banco sync <name>       # sync a specific provider by name or alias
+```
+
+Sync is non-destructive: it never deletes or overwrites existing files.
+
+**Tasks (issues):**
+
+| Situation                         | Action                                                           |
+| --------------------------------- | ---------------------------------------------------------------- |
+| Issue not yet on disk             | Creates a new file with initial content                          |
+| Issue title changed               | Renames the file; content is untouched                           |
+| Issue moved to a different column | Moves the file to the new column directory; content is untouched |
+| Issue unchanged                   | Does nothing                                                     |
+
+**Repos:**
+
+| Situation            | Action                         |
+| -------------------- | ------------------------------ |
+| Repo not yet on disk | Clones via SSH                 |
+| Repo already on disk | Runs `git fetch --all --prune` |
 
 # Templates
 

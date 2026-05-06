@@ -1,8 +1,10 @@
 mod cli;
+mod config;
 mod context;
 mod module;
 mod provider;
 mod providers;
+mod template;
 mod tui;
 
 use std::collections::HashMap;
@@ -12,10 +14,11 @@ use anyhow::Context;
 use dialoguer::theme::ColorfulTheme;
 use clap::Parser;
 
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, ProviderAction};
 use context::{ContextOutput, ProviderContext};
 use provider::Provider;
 use providers::local::LocalProvider;
+use providers::gitlab::GitLabProvider;
 
 fn parse_labels(raw: &[String]) -> anyhow::Result<HashMap<String, String>> {
     raw.iter()
@@ -57,6 +60,120 @@ Available modules and their labels are listed in the `labels` field of `banco co
     Ok(())
 }
 
+const AVAILABLE_PROVIDERS: &[&str] = &["gitlab"];
+
+fn provider_add(root: &Path) -> anyhow::Result<()> {
+    let theme = ColorfulTheme::default();
+
+    let idx = dialoguer::Select::with_theme(&theme)
+        .with_prompt("Provider")
+        .items(AVAILABLE_PROVIDERS)
+        .default(0)
+        .interact()?;
+    let name = AVAILABLE_PROVIDERS[idx];
+
+    let project_config = config::load(root)?;
+    let alias_required = project_config.providers.iter().any(|p| p.name == name);
+
+    let alias_input: String = if alias_required {
+        dialoguer::Input::with_theme(&theme)
+            .with_prompt("Alias (required: a provider of this kind already exists)")
+            .allow_empty(false)
+            .interact_text()?
+    } else {
+        dialoguer::Input::with_theme(&theme)
+            .with_prompt("Alias (leave blank if not needed)")
+            .allow_empty(true)
+            .interact_text()?
+    };
+    let alias = if alias_input.trim().is_empty() {
+        None
+    } else {
+        Some(alias_input.trim().to_string())
+    };
+
+    let schema = match name {
+        "gitlab" => GitLabProvider::available_config_schema(),
+        _ => vec![],
+    };
+
+    let mut cfg_map: std::collections::HashMap<String, serde_yaml::Value> =
+        std::collections::HashMap::new();
+
+    for param in &schema {
+        let prompt = if param.required {
+            format!("{} ({})", param.name, param.description)
+        } else {
+            format!("{} ({}) [optional]", param.name, param.description)
+        };
+
+        match param.kind {
+            provider::ConfigParamKind::String => {
+                let value: String = dialoguer::Input::with_theme(&theme)
+                    .with_prompt(&prompt)
+                    .allow_empty(!param.required)
+                    .interact_text()?;
+                if !value.is_empty() {
+                    cfg_map.insert(param.name.to_string(), serde_yaml::Value::String(value));
+                }
+            }
+            provider::ConfigParamKind::List => {
+                println!("{} (enter one per line, empty line to finish):", prompt);
+                let mut items = Vec::new();
+                loop {
+                    let item: String = dialoguer::Input::with_theme(&theme)
+                        .with_prompt("  >")
+                        .allow_empty(true)
+                        .interact_text()?;
+                    if item.trim().is_empty() {
+                        break;
+                    }
+                    items.push(serde_yaml::Value::String(item.trim().to_string()));
+                }
+                if !items.is_empty() {
+                    cfg_map.insert(param.name.to_string(), serde_yaml::Value::Sequence(items));
+                }
+            }
+        }
+    }
+
+    let entry = config::ProviderEntry {
+        name: name.to_string(),
+        alias,
+        enabled: true,
+        config: cfg_map,
+    };
+
+    let mut project_config = project_config;
+    project_config.providers.push(entry);
+    config::save(root, &project_config)?;
+
+    println!("Provider '{}' added.", name);
+    Ok(())
+}
+
+fn provider_list(root: &Path) -> anyhow::Result<()> {
+    let project_config = config::load(root)?;
+    if project_config.providers.is_empty() {
+        println!("No providers configured.");
+        return Ok(());
+    }
+    for p in &project_config.providers {
+        println!("{}", p.display_name());
+    }
+    Ok(())
+}
+
+fn gitlab_providers(root: &Path) -> anyhow::Result<Vec<GitLabProvider>> {
+    let project_config = config::load(root)?;
+    Ok(project_config
+        .providers
+        .into_iter()
+        .filter(|e| e.name == "gitlab")
+        .map(GitLabProvider::new)
+        .collect())
+}
+
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let root = std::env::current_dir().context("failed to get current directory")?;
@@ -75,6 +192,14 @@ fn run() -> anyhow::Result<()> {
                     anyhow::bail!("directory is not empty; use --update to re-run initialization");
                 }
                 std::fs::create_dir_all(&banco_dir)?;
+                config::save(&root, &config::ProjectConfig {
+                    providers: vec![config::ProviderEntry {
+                        name: "local".to_string(),
+                        alias: None,
+                        enabled: true,
+                        config: std::collections::HashMap::new(),
+                    }],
+                })?;
             }
             local.init(&root)?;
             write_agent_files(&root, &local)?;
@@ -108,42 +233,6 @@ fn run() -> anyhow::Result<()> {
                 }
             }
         }
-        Commands::Edit { module } => {
-            let editor = std::env::var("EDITOR")
-                .map_err(|_| anyhow::anyhow!("$EDITOR is not set"))?;
-
-            let m: &dyn module::Module = match module {
-                Some(ref name) => local
-                    .find_module(name)
-                    .ok_or_else(|| anyhow::anyhow!("unknown module '{}'", name))?,
-                None => {
-                    let modules = local.modules();
-                    let names: Vec<&str> = modules.iter().map(|m| m.cli_name()).collect();
-                    let idx = dialoguer::Select::with_theme(&ColorfulTheme::default())
-                        .with_prompt("Module")
-                        .items(&names)
-                        .default(0)
-                        .interact()?;
-                    modules[idx].as_ref()
-                }
-            };
-
-            let items = m.list(&root)?;
-            if items.is_empty() {
-                anyhow::bail!("no items found");
-            }
-            let labels: Vec<&str> = items.iter().map(|(l, _)| l.as_str()).collect();
-            let idx = dialoguer::FuzzySelect::with_theme(&ColorfulTheme::default())
-                .with_prompt("Item")
-                .items(&labels)
-                .default(0)
-                .interact()?;
-            let (_, path) = &items[idx];
-            std::process::Command::new(&editor)
-                .arg(path)
-                .status()
-                .with_context(|| format!("failed to launch editor '{}'", editor))?;
-        }
         Commands::Template => {
             let paths = local.all_template_paths(&root);
             if paths.is_empty() {
@@ -168,15 +257,44 @@ fn run() -> anyhow::Result<()> {
         }
         Commands::Context => {
             let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-            let output = ContextOutput {
-                project,
-                providers: vec![ProviderContext {
-                    name: local.name().to_string(),
-                    modules: local.context(&root)?,
-                }],
-            };
+            let mut providers = vec![ProviderContext {
+                name: local.name().to_string(),
+                modules: local.context(&root)?,
+            }];
+            for gl in gitlab_providers(&root)? {
+                providers.push(ProviderContext {
+                    name: gl.name().to_string(),
+                    modules: gl.context(&root)?,
+                });
+            }
+            let output = ContextOutput { project, providers };
             println!("{}", serde_json::to_string_pretty(&output)?);
         }
+        Commands::Sync { provider } => {
+            let providers = gitlab_providers(&root)?;
+            if providers.is_empty() {
+                anyhow::bail!("no providers configured; run `banco provider add` first");
+            }
+            let to_sync: Vec<&GitLabProvider> = match &provider {
+                Some(name) => providers.iter().filter(|p| p.name() == name).collect(),
+                None => providers.iter().collect(),
+            };
+            if to_sync.is_empty() {
+                anyhow::bail!("no provider named '{}'", provider.unwrap());
+            }
+            for p in to_sync {
+                println!("Syncing {}...", p.name());
+                p.sync(&root)?;
+            }
+        }
+        Commands::Provider { action } => match action {
+            ProviderAction::Add => {
+                provider_add(&root)?;
+            }
+            ProviderAction::List => {
+                provider_list(&root)?;
+            }
+        },
     }
 
     Ok(())
