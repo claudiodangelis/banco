@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 
 #[derive(Parser)]
 #[command(name = "banco", about = "Banco project management tool")]
@@ -40,6 +41,11 @@ pub enum Commands {
     Sync {
         /// Provider name or alias to sync (syncs all if omitted)
         provider: Option<String>,
+    },
+    /// Generate shell completion scripts
+    Completions {
+        /// Shell to generate completions for
+        shell: Shell,
     },
 }
 

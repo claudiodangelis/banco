@@ -14,6 +14,9 @@ use anyhow::Context;
 use dialoguer::theme::ColorfulTheme;
 use clap::Parser;
 
+use clap::CommandFactory;
+use clap_complete::generate;
+
 use cli::{Cli, Commands, ProviderAction};
 use context::{ContextOutput, ProviderContext};
 use provider::Provider;
@@ -33,7 +36,7 @@ fn parse_labels(raw: &[String]) -> anyhow::Result<HashMap<String, String>> {
 
 fn write_agent_files(root: &Path, local: &LocalProvider) -> anyhow::Result<()> {
     let descriptions = local.module_descriptions();
-    let agents_md = format!(
+    let banco_md = format!(
         "# Banco Project\n\n\
 This is a Banco project. Below is a description of the directory structure.\n\n\
 Banco is an open-source project management tool for the command line: https://github.com/claudiodangelis/banco\n\n\
@@ -56,8 +59,15 @@ banco new repo -n \"my-project\"\n\
 Available modules and their labels are listed in the `labels` field of `banco context`.\n",
         descriptions.join("\n\n")
     );
-    std::fs::write(root.join("AGENTS.md"), agents_md)?;
-    std::fs::write(root.join("CLAUDE.md"), "@AGENTS.md\n")?;
+    std::fs::write(root.join(".banco/BANCO.md"), banco_md)?;
+    let agents_path = root.join("AGENTS.md");
+    if !agents_path.exists() {
+        std::fs::write(&agents_path, "@.banco/BANCO.md\n")?;
+    }
+    let claude_path = root.join("CLAUDE.md");
+    if !claude_path.exists() {
+        std::fs::write(&claude_path, "@AGENTS.md\n")?;
+    }
     Ok(())
 }
 
@@ -294,6 +304,11 @@ fn run() -> anyhow::Result<()> {
                 println!("Syncing {}...", p.name());
                 p.sync(&root)?;
             }
+        }
+        Commands::Completions { shell } => {
+            let mut cmd = Cli::command();
+            let bin_name = cmd.get_name().to_string();
+            generate(shell, &mut cmd, bin_name, &mut std::io::stdout());
         }
         Commands::Provider { action } => match action {
             ProviderAction::Add => {

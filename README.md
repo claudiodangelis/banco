@@ -168,6 +168,7 @@ Banco supports the following commands:
 - context
 - provider
 - sync
+- completions
 
 ## init
 
@@ -303,6 +304,28 @@ When creating a note in `notes/local/meetings/`, banco checks:
 The first match found is used as the initial content of the new file. If no template is found, the file is created empty.
 
 Use `banco template` to create or edit templates interactively.
+
+## completions
+
+Prints a shell completion script to stdout. Supported shells: `bash`, `fish`, `zsh`, `elvish`, `powershell`.
+
+```sh
+banco completions bash   # generate bash completions
+banco completions zsh    # generate zsh completions
+banco completions fish   # generate fish completions
+```
+
+To enable completions for your current shell session, source the output directly:
+
+```sh
+source <(banco completions bash)
+```
+
+To persist completions, write the output to the appropriate location for your shell. For example, on most Linux systems for bash:
+
+```sh
+banco completions bash > ~/.local/share/bash-completion/completions/banco
+```
 
 # Author
 
