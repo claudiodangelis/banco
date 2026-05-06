@@ -68,21 +68,6 @@ Provider configuration is stored in `.banco/config.yml` within the project direc
             └── 0002 - Write project requirements.md
 ```
 
-## Providers
-
-| Provider | Modules   | Status    |
-| -------- | --------- | --------- |
-| local    | notes     | available |
-|          | tasks     |           |
-|          | bookmarks |           |
-|          | repos     |           |
-| gitlab   | tasks     | available |
-|          | repos     |           |
-| jira     | tasks     | planned   |
-| github   | tasks     | planned   |
-|          | repos     |           |
-| gerrit   | repos     | planned   |
-
 # Providers
 
 ## local
