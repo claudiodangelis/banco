@@ -18,6 +18,7 @@ use cli::{Cli, Commands, ProviderAction};
 use context::{ContextOutput, ProviderContext};
 use provider::Provider;
 use providers::local::LocalProvider;
+use providers::github::GitHubProvider;
 use providers::gitlab::GitLabProvider;
 
 fn parse_labels(raw: &[String]) -> anyhow::Result<HashMap<String, String>> {
@@ -60,7 +61,7 @@ Available modules and their labels are listed in the `labels` field of `banco co
     Ok(())
 }
 
-const AVAILABLE_PROVIDERS: &[&str] = &["gitlab"];
+const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab"];
 
 fn provider_add(root: &Path) -> anyhow::Result<()> {
     let theme = ColorfulTheme::default();
@@ -93,6 +94,7 @@ fn provider_add(root: &Path) -> anyhow::Result<()> {
     };
 
     let schema = match name {
+        "github" => GitHubProvider::available_config_schema(),
         "gitlab" => GitLabProvider::available_config_schema(),
         _ => vec![],
     };
@@ -164,14 +166,20 @@ fn provider_list(root: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn gitlab_providers(root: &Path) -> anyhow::Result<Vec<GitLabProvider>> {
+fn remote_providers(root: &Path) -> anyhow::Result<Vec<Box<dyn Provider>>> {
     let project_config = config::load(root)?;
-    Ok(project_config
-        .providers
-        .into_iter()
-        .filter(|e| e.name == "gitlab")
-        .map(GitLabProvider::new)
-        .collect())
+    let mut providers: Vec<Box<dyn Provider>> = Vec::new();
+    for entry in project_config.providers {
+        if !entry.enabled {
+            continue;
+        }
+        match entry.name.as_str() {
+            "github" => providers.push(Box::new(GitHubProvider::new(entry))),
+            "gitlab" => providers.push(Box::new(GitLabProvider::new(entry))),
+            _ => {}
+        }
+    }
+    Ok(providers)
 }
 
 fn run() -> anyhow::Result<()> {
@@ -261,23 +269,23 @@ fn run() -> anyhow::Result<()> {
                 name: local.name().to_string(),
                 modules: local.context(&root)?,
             }];
-            for gl in gitlab_providers(&root)? {
+            for p in remote_providers(&root)? {
                 providers.push(ProviderContext {
-                    name: gl.name().to_string(),
-                    modules: gl.context(&root)?,
+                    name: p.name().to_string(),
+                    modules: p.context(&root)?,
                 });
             }
             let output = ContextOutput { project, providers };
             println!("{}", serde_json::to_string_pretty(&output)?);
         }
         Commands::Sync { provider } => {
-            let providers = gitlab_providers(&root)?;
+            let providers = remote_providers(&root)?;
             if providers.is_empty() {
                 anyhow::bail!("no providers configured; run `banco provider add` first");
             }
-            let to_sync: Vec<&GitLabProvider> = match &provider {
-                Some(name) => providers.iter().filter(|p| p.name() == name).collect(),
-                None => providers.iter().collect(),
+            let to_sync: Vec<&dyn Provider> = match &provider {
+                Some(name) => providers.iter().filter(|p| p.name() == name.as_str()).map(|p| p.as_ref()).collect(),
+                None => providers.iter().map(|p| p.as_ref()).collect(),
             };
             if to_sync.is_empty() {
                 anyhow::bail!("no provider named '{}'", provider.unwrap());

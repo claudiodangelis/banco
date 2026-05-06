@@ -81,7 +81,7 @@ The local provider is enabled by default and added to `.banco/config.yml` automa
 | bookmarks | `bookmarks/local/` | Markdown files                    | `label` (string, optional — nested tag, e.g. `tools/rust`), `url` (string) |
 | repos     | `repos/local/`     | Directories, `git init` on create | —                                                                          |
 
-> **Note:** GitHub and Gerrit providers are planned and will be available soon — those may be a better fit for repositories hosted on a remote platform.
+> **Note:** Gerrit provider is planned and will be available soon.
 
 ## gitlab
 
@@ -125,6 +125,38 @@ Description here...
 ```
 
 Repos from configured projects are cloned under `repos/<provider>/`.
+
+## github
+
+The GitHub provider syncs tasks (issues) and repositories from configured GitHub projects into
+the local filesystem. Issues are organized by open/closed state; repositories are cloned via SSH
+and kept up to date with `git fetch`. Pull requests are excluded from tasks.
+
+**Configuration parameters** (set interactively via `banco provider add`):
+
+| Parameter          | Required | Description                                           |
+| ------------------ | -------- | ----------------------------------------------------- |
+| `api_key`          | yes      | GitHub personal access token                          |
+| `projects`         | no †     | Explicit list of project paths in `owner/repo` format |
+| `projects_pattern` | no †     | Regex matched against `owner/repo` — e.g. `myorg/.*`  |
+
+† Exactly one of `projects` or `projects_pattern` must be set; they are mutually exclusive.
+
+**Directory structure:**
+
+Tasks are organized under `tasks/<provider>/`:
+
+```
+tasks/
+└── github/
+    └── myorg/
+        └── my-project/
+            ├── 1-open/
+            │   └── 0042 - Fix login bug.md
+            └── 2-closed/
+```
+
+Repos are cloned under `repos/<provider>/`.
 
 # Commands
 
