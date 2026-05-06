@@ -59,7 +59,7 @@ impl GitHubProvider {
     }
 
     fn client(&self) -> GitHubClient {
-        let token = self.entry.get_str("api_key").map(|s| s.to_string());
+        let token = self.entry.get_str("api_key");
         GitHubClient::new("https://api.github.com", token)
     }
 

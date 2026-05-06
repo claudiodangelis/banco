@@ -25,13 +25,23 @@ pub struct ProviderEntry {
     pub config: HashMap<String, serde_yaml::Value>,
 }
 
+fn expand_env(s: &str) -> String {
+    if let Some(var) = s.strip_prefix("${").and_then(|s| s.strip_suffix('}')) {
+        std::env::var(var).unwrap_or_else(|_| s.to_string())
+    } else if let Some(var) = s.strip_prefix('$') {
+        std::env::var(var).unwrap_or_else(|_| s.to_string())
+    } else {
+        s.to_string()
+    }
+}
+
 impl ProviderEntry {
     pub fn display_name(&self) -> &str {
         self.alias.as_deref().unwrap_or(&self.name)
     }
 
-    pub fn get_str(&self, key: &str) -> Option<&str> {
-        self.config.get(key).and_then(|v| v.as_str())
+    pub fn get_str(&self, key: &str) -> Option<String> {
+        self.config.get(key).and_then(|v| v.as_str()).map(expand_env)
     }
 
     pub fn get_list(&self, key: &str) -> Vec<String> {

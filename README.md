@@ -34,7 +34,7 @@ Items (notes, tasks, bookmarks, etc.) are grouped in modules and provided by pro
 The local provider is built in and enabled by default.
 You can use aliases when using the same provider multiple times.
 
-Provider configuration is stored in `.banco/config.yml` within the project directory. Each provider entry supports a common `enabled` field (default: `true`) — set it to `false` to disable a provider without removing its configuration. Here is how a project managed by Banco looks on the filesystem:
+Provider configuration is stored in `.banco/config.yml` within the project directory. Each provider entry supports a common `enabled` field (default: `true`) — set it to `false` to disable a provider without removing its configuration. String values in the config support environment variable expansion: use `$VAR` or `${VAR}` to avoid storing tokens in plain text (e.g. `api_key: $GITLAB_TOKEN`). Here is how a project managed by Banco looks on the filesystem:
 
 ```
 ├── .banco

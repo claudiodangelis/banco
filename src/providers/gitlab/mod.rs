@@ -68,9 +68,8 @@ impl GitLabProvider {
         let host = self
             .entry
             .get_str("host")
-            .unwrap_or("https://gitlab.com")
-            .to_string();
-        let token = self.entry.get_str("api_key").map(|s| s.to_string());
+            .unwrap_or_else(|| "https://gitlab.com".to_string());
+        let token = self.entry.get_str("api_key");
         GitLabClient::new(&host, token)
     }
 
