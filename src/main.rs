@@ -38,14 +38,80 @@ fn write_agent_files(root: &Path, local: &LocalProvider) -> anyhow::Result<()> {
     let descriptions = local.module_descriptions();
     let banco_md = format!(
         "# Banco Project\n\n\
-This is a Banco project. Below is a description of the directory structure.\n\n\
-Banco is an open-source project management tool for the command line: https://github.com/claudiodangelis/banco\n\n\
-{}\n\n\
-# Commands\n\n\
-## banco context\n\n\
-Run `banco context` to get a JSON summary of the project state (notes, tasks, repos, etc.).\n\n\
-## banco new\n\n\
-Use `banco new <module>` to create a new item. The `-n` flag sets the name and `-l` sets a label as `key=value`.\n\n\
+This is a **Banco** project. Banco is an open-source project management tool \
+for the command line that organizes notes, tasks, bookmarks, and repositories \
+as plain files on the filesystem.\n\n\
+Banco source and documentation: https://github.com/claudiodangelis/banco\n\n\
+---\n\n\
+## Providers\n\n\
+A **provider** is a source of items. Each provider contributes one or more \
+modules (tasks, notes, bookmarks, repos) and is responsible for storing and \
+syncing the data it owns.\n\n\
+The **local** provider is the default provider. It is always present and \
+enabled — no configuration or network access required. It manages items stored \
+entirely on the local filesystem: notes, tasks, bookmarks, and repositories.\n\n\
+Additional providers (GitHub, GitLab) can be added via `banco provider add` \
+and sync remote data (issues, repos) into the local filesystem when \
+`banco sync` is run.\n\n\
+The active providers and their modules are listed in the `providers` field of \
+`banco context`.\n\n\
+---\n\n\
+## Rules for agents\n\n\
+### 1. Always start with `banco context`\n\n\
+Before doing anything, run `banco context` to get a complete JSON snapshot of \
+the project state:\n\n\
+```sh\n\
+banco context\n\
+```\n\n\
+The output contains:\n\n\
+- **providers** — the list of active providers (local, github, gitlab, …)\n\
+- **modules** — each provider's modules (tasks, notes, bookmarks, repos)\n\
+- **labels** — the parameters accepted by each module, including the allowed \
+values for `enum` labels\n\
+- **items** — the current list of items in each module\n\n\
+Read the context every time before answering questions about the project state \
+or before constructing any command. Never assume the state from memory alone.\n\n\
+### 2. Never create or move files directly\n\n\
+All items (notes, tasks, bookmarks, repositories) **must** be created through \
+`banco new`. Never write files or create directories by hand — banco manages \
+naming, numbering, and placement automatically. Bypassing banco will corrupt \
+the project structure.\n\n\
+### 3. Derive every command from the context\n\n\
+The `labels` array in `banco context` output specifies exactly which parameters \
+each module accepts. For `enum` labels it also lists the allowed values. Always \
+inspect the context before building a `banco new` command so you pass the \
+correct label keys and values.\n\n\
+Example context excerpt:\n\n\
+```json\n\
+{{\n\
+  \"name\": \"tasks\",\n\
+  \"labels\": [\n\
+    {{\n\
+      \"name\": \"status\",\n\
+      \"type\": \"enum\",\n\
+      \"values\": [\"backlog\", \"doing\", \"done\"],\n\
+      \"description\": \"Status of the task\"\n\
+    }}\n\
+  ]\n\
+}}\n\
+```\n\n\
+From this you know that `banco new task` accepts `-l status=<value>` where \
+`<value>` must be one of `backlog`, `doing`, or `done`. Passing an invalid \
+value causes the command to fail. Always derive valid values from the context \
+— never guess.\n\n\
+---\n\n\
+## Commands\n\n\
+### `banco context`\n\n\
+Returns a minified JSON summary of the current project state. This is the \
+authoritative source of truth for the project — use it before every action.\n\n\
+```sh\n\
+banco context           # minified JSON (default, preferred for agents)\n\
+banco context --pretty  # pretty-printed for human reading\n\
+```\n\n\
+### `banco new <module>`\n\n\
+Creates a new item in the given module. Use `-n` for the name and \
+`-l key=value` for each label. The list of available modules and their \
+accepted labels is in the `labels` field of `banco context`.\n\n\
 ```sh\n\
 # Create a note\n\
 banco new note -n \"My note\" -l \"label=meetings\"\n\n\
@@ -56,7 +122,17 @@ banco new bookmark -n \"Rust book\" -l \"label=tools/rust\" -l \"url=https://doc
 # Create a local repository (initialized as a git repo)\n\
 banco new repo -n \"my-project\"\n\
 ```\n\n\
-Available modules and their labels are listed in the `labels` field of `banco context`.\n",
+**Do not invent label names or values.** Only use what the context reports.\n\n\
+### `banco sync [provider]`\n\n\
+Pulls data from configured remote providers (GitHub, GitLab) and writes tasks \
+and repos to the filesystem. Run without arguments to sync all providers.\n\n\
+```sh\n\
+banco sync           # sync all providers\n\
+banco sync github    # sync a specific provider by name or alias\n\
+```\n\n\
+---\n\n\
+## Directory structure\n\n\
+{}\n",
         descriptions.join("\n\n")
     );
     std::fs::write(root.join(".banco/BANCO.md"), banco_md)?;
