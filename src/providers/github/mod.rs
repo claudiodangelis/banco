@@ -36,6 +36,12 @@ impl GitHubProvider {
                 required: true,
             },
             ConfigParam {
+                name: "host",
+                description: "GitHub instance URL (default: https://github.com) — set for GitHub Enterprise Server",
+                kind: ConfigParamKind::String,
+                required: false,
+            },
+            ConfigParam {
                 name: "projects",
                 description: "Explicit project paths to sync (owner/repo) — mutually exclusive with projects_pattern",
                 kind: ConfigParamKind::List,
@@ -60,7 +66,11 @@ impl GitHubProvider {
 
     fn client(&self) -> GitHubClient {
         let token = self.entry.get_str("api_key");
-        GitHubClient::new("https://api.github.com", token)
+        let base_url = match self.entry.get_str("host") {
+            Some(host) => format!("{}/api/v3", host.trim_end_matches('/')),
+            None => "https://api.github.com".to_string(),
+        };
+        GitHubClient::new(&base_url, token)
     }
 
     fn resolved_projects(&self, client: &GitHubClient) -> anyhow::Result<Vec<String>> {

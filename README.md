@@ -134,11 +134,12 @@ and kept up to date with `git fetch`. Pull requests are excluded from tasks.
 
 **Configuration parameters** (set interactively via `banco provider add`):
 
-| Parameter          | Required | Description                                           |
-| ------------------ | -------- | ----------------------------------------------------- |
-| `api_key`          | yes      | GitHub personal access token                          |
-| `projects`         | no †     | Explicit list of project paths in `owner/repo` format |
-| `projects_pattern` | no †     | Regex matched against `owner/repo` — e.g. `myorg/.*`  |
+| Parameter          | Required | Description                                                               |
+| ------------------ | -------- | ------------------------------------------------------------------------- |
+| `api_key`          | yes      | GitHub personal access token                                              |
+| `host`             | no       | GitHub instance URL (default: `https://github.com`) — set for GitHub Enterprise Server |
+| `projects`         | no †     | Explicit list of project paths in `owner/repo` format                     |
+| `projects_pattern` | no †     | Regex matched against `owner/repo` — e.g. `myorg/.*`                      |
 
 † Exactly one of `projects` or `projects_pattern` must be set; they are mutually exclusive.
 
