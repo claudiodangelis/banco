@@ -199,10 +199,11 @@ Banco reads the current module structure and presents a selection of available p
 
 ## context
 
-Outputs a JSON summary of the project state to stdout. Intended primarily for agents — run it to give an AI assistant full context about the project contents.
+Outputs a minified JSON summary of the project state to stdout. Intended primarily for agents — run it to give an AI assistant full context about the project contents.
 
 ```sh
-banco context  # or: banco ctx
+banco context           # or: banco ctx
+banco context --pretty  # pretty-print the JSON output
 ```
 
 ```json

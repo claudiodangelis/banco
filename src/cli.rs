@@ -27,7 +27,11 @@ pub enum Commands {
     Template,
     /// Output a JSON summary of the project state (intended for agents)
     #[command(alias = "ctx")]
-    Context,
+    Context {
+        /// Pretty-print the JSON output
+        #[arg(long)]
+        pretty: bool,
+    },
     /// Manage providers
     Provider {
         #[command(subcommand)]

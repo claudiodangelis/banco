@@ -267,7 +267,7 @@ fn run() -> anyhow::Result<()> {
                 .status()
                 .with_context(|| format!("failed to launch editor '{}'", editor))?;
         }
-        Commands::Context => {
+        Commands::Context { pretty } => {
             let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
             let mut providers = vec![ProviderContext {
                 name: local.name().to_string(),
@@ -280,7 +280,12 @@ fn run() -> anyhow::Result<()> {
                 });
             }
             let output = ContextOutput { project, providers };
-            println!("{}", serde_json::to_string_pretty(&output)?);
+            let json = if pretty {
+                serde_json::to_string_pretty(&output)?
+            } else {
+                serde_json::to_string(&output)?
+            };
+            println!("{}", json);
         }
         Commands::Sync { provider } => {
             let providers = remote_providers(&root)?;
