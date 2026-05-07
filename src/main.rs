@@ -82,19 +82,7 @@ each module accepts. For `enum` labels it also lists the allowed values. Always 
 inspect the context before building a `banco new` command so you pass the \
 correct label keys and values.\n\n\
 Example context excerpt:\n\n\
-```json\n\
-{{\n\
-  \"name\": \"tasks\",\n\
-  \"labels\": [\n\
-    {{\n\
-      \"name\": \"status\",\n\
-      \"type\": \"enum\",\n\
-      \"values\": [\"backlog\", \"doing\", \"done\"],\n\
-      \"description\": \"Status of the task\"\n\
-    }}\n\
-  ]\n\
-}}\n\
-```\n\n\
+```json\n{{\n  \"name\": \"tasks\",\n  \"labels\": [\n    {{\n      \"name\": \"status\",\n      \"type\": \"enum\",\n      \"values\": [\"backlog\", \"doing\", \"done\"],\n      \"description\": \"Status of the task\"\n    }}\n  ]\n}}\n```\n\n\
 From this you know that `banco new task` accepts `-l status=<value>` where \
 `<value>` must be one of `backlog`, `doing`, or `done`. Passing an invalid \
 value causes the command to fail. Always derive valid values from the context \
