@@ -44,6 +44,10 @@ impl ProviderEntry {
         self.config.get(key).and_then(|v| v.as_str()).map(expand_env)
     }
 
+    pub fn get_bool(&self, key: &str, default: bool) -> bool {
+        self.config.get(key).and_then(|v| v.as_bool()).unwrap_or(default)
+    }
+
     pub fn get_list(&self, key: &str) -> Vec<String> {
         self.config
             .get(key)

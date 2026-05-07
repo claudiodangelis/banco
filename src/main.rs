@@ -129,6 +129,13 @@ fn provider_add(root: &Path) -> anyhow::Result<()> {
                     cfg_map.insert(param.name.to_string(), serde_yaml::Value::String(value));
                 }
             }
+            provider::ConfigParamKind::Bool => {
+                let value = dialoguer::Confirm::with_theme(&theme)
+                    .with_prompt(&prompt)
+                    .default(true)
+                    .interact()?;
+                cfg_map.insert(param.name.to_string(), serde_yaml::Value::Bool(value));
+            }
             provider::ConfigParamKind::List => {
                 println!("{} (enter one per line, empty line to finish):", prompt);
                 let mut items = Vec::new();

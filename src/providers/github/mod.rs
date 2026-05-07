@@ -42,6 +42,12 @@ impl GitHubProvider {
                 required: false,
             },
             ConfigParam {
+                name: "sync_issues",
+                description: "Sync issues as tasks (default: true)",
+                kind: ConfigParamKind::Bool,
+                required: false,
+            },
+            ConfigParam {
                 name: "projects",
                 description: "Explicit project paths to sync (owner/repo) — mutually exclusive with projects_pattern",
                 kind: ConfigParamKind::List,
@@ -194,51 +200,54 @@ impl Provider for GitHubProvider {
         let client = self.client();
         let projects = self.resolved_projects(&client)?;
 
+        let sync_issues = self.entry.get_bool("sync_issues", true);
         let template_base = format!("tasks/{}", self.entry.display_name());
 
-        for owner_repo in &projects {
-            let owner = owner_repo.split('/').next().unwrap_or(owner_repo);
-            let repo_name = owner_repo.rsplit('/').next().unwrap_or(owner_repo);
-            let task_dir = self.tasks_root(root).join(owner).join(repo_name);
+        if sync_issues {
+            for owner_repo in &projects {
+                let owner = owner_repo.split('/').next().unwrap_or(owner_repo);
+                let repo_name = owner_repo.rsplit('/').next().unwrap_or(owner_repo);
+                let task_dir = self.tasks_root(root).join(owner).join(repo_name);
 
-            let open_col = task_dir.join("1-open");
-            let closed_col = task_dir.join("2-closed");
-            std::fs::create_dir_all(&open_col)?;
-            std::fs::create_dir_all(&closed_col)?;
+                let open_col = task_dir.join("1-open");
+                let closed_col = task_dir.join("2-closed");
+                std::fs::create_dir_all(&open_col)?;
+                std::fs::create_dir_all(&closed_col)?;
 
-            let open_tpl = find_template(
-                root,
-                &template_base,
-                &format!("{}/{}/1-open", owner, repo_name),
-            );
-            let closed_tpl = find_template(
-                root,
-                &template_base,
-                &format!("{}/{}/2-closed", owner, repo_name),
-            );
+                let open_tpl = find_template(
+                    root,
+                    &template_base,
+                    &format!("{}/{}/1-open", owner, repo_name),
+                );
+                let closed_tpl = find_template(
+                    root,
+                    &template_base,
+                    &format!("{}/{}/2-closed", owner, repo_name),
+                );
 
-            let mut existing_open = scan_col(&open_col);
-            for issue in client.issues_open(owner_repo)? {
-                if issue.pull_request.is_some() {
-                    continue;
+                let mut existing_open = scan_col(&open_col);
+                for issue in client.issues_open(owner_repo)? {
+                    if issue.pull_request.is_some() {
+                        continue;
+                    }
+                    apply_issue(&issue, &open_col, &mut existing_open, open_tpl.as_deref())?;
                 }
-                apply_issue(&issue, &open_col, &mut existing_open, open_tpl.as_deref())?;
-            }
 
-            let mut existing_closed = scan_col(&closed_col);
-            for issue in client.issues_closed(owner_repo)? {
-                if issue.pull_request.is_some() {
-                    continue;
+                let mut existing_closed = scan_col(&closed_col);
+                for issue in client.issues_closed(owner_repo)? {
+                    if issue.pull_request.is_some() {
+                        continue;
+                    }
+                    apply_issue(
+                        &issue,
+                        &closed_col,
+                        &mut existing_closed,
+                        closed_tpl.as_deref(),
+                    )?;
                 }
-                apply_issue(
-                    &issue,
-                    &closed_col,
-                    &mut existing_closed,
-                    closed_tpl.as_deref(),
-                )?;
-            }
 
-            println!("  synced issues for {}", owner_repo);
+                println!("  synced issues for {}", owner_repo);
+            }
         }
 
         if !projects.is_empty() {

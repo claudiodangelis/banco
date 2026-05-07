@@ -41,6 +41,12 @@ impl GitLabProvider {
                 required: false,
             },
             ConfigParam {
+                name: "sync_issues",
+                description: "Sync issues as tasks (default: true)",
+                kind: ConfigParamKind::Bool,
+                required: false,
+            },
+            ConfigParam {
                 name: "projects",
                 description: "Explicit project paths to sync (namespace/project) — mutually exclusive with projects_pattern",
                 kind: ConfigParamKind::List,
@@ -188,30 +194,33 @@ impl Provider for GitLabProvider {
     fn sync(&self, root: &Path) -> anyhow::Result<()> {
         let client = self.client();
         let projects = self.resolved_projects(&client)?;
+        let sync_issues = self.entry.get_bool("sync_issues", true);
         let template_base = format!("tasks/{}", self.entry.display_name());
 
-        for namespace_project in &projects {
-            let project = client.project(namespace_project)?;
-            let task_dir = self.tasks_root(root).join(&project.path);
-            let open_col = task_dir.join("1-open");
-            let closed_col = task_dir.join("2-closed");
-            std::fs::create_dir_all(&open_col)?;
-            std::fs::create_dir_all(&closed_col)?;
+        if sync_issues {
+            for namespace_project in &projects {
+                let project = client.project(namespace_project)?;
+                let task_dir = self.tasks_root(root).join(&project.path);
+                let open_col = task_dir.join("1-open");
+                let closed_col = task_dir.join("2-closed");
+                std::fs::create_dir_all(&open_col)?;
+                std::fs::create_dir_all(&closed_col)?;
 
-            let open_tpl = find_template(root, &template_base, &format!("{}/1-open", project.path));
-            let closed_tpl = find_template(root, &template_base, &format!("{}/2-closed", project.path));
+                let open_tpl = find_template(root, &template_base, &format!("{}/1-open", project.path));
+                let closed_tpl = find_template(root, &template_base, &format!("{}/2-closed", project.path));
 
-            let mut existing_open = scan_col(&open_col);
-            for issue in client.issues_open(project.id)? {
-                apply_issue(&issue, &open_col, &mut existing_open, open_tpl.as_deref())?;
+                let mut existing_open = scan_col(&open_col);
+                for issue in client.issues_open(project.id)? {
+                    apply_issue(&issue, &open_col, &mut existing_open, open_tpl.as_deref())?;
+                }
+
+                let mut existing_closed = scan_col(&closed_col);
+                for issue in client.issues_closed(project.id)? {
+                    apply_issue(&issue, &closed_col, &mut existing_closed, closed_tpl.as_deref())?;
+                }
+
+                println!("  synced issues for {}", namespace_project);
             }
-
-            let mut existing_closed = scan_col(&closed_col);
-            for issue in client.issues_closed(project.id)? {
-                apply_issue(&issue, &closed_col, &mut existing_closed, closed_tpl.as_deref())?;
-            }
-
-            println!("  synced issues for {}", namespace_project);
         }
 
         if !projects.is_empty() {
