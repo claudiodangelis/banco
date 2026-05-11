@@ -48,6 +48,7 @@ Provider configuration is stored in `.banco/config.yml` within the project direc
 ```
 ├── .banco
 │   └── config.yml              ← provider configuration
+├── misc                        ← not managed by banco; store anything here
 ├── notes
 │   └── local
 │       ├── meetings
@@ -179,7 +180,7 @@ Banco supports the following commands:
 
 ## init
 
-Run `banco init` in an empty directory to set up a new banco project. Banco creates the directory skeleton for each module (e.g. `tasks/local/backlog`, `tasks/local/doing`, `tasks/local/done`) and generates `.banco/BANCO.md`, `AGENTS.md`, and `CLAUDE.md` for agentic workflows.
+Run `banco init` in an empty directory to set up a new banco project. Banco creates the directory skeleton for each module (e.g. `tasks/local/backlog`, `tasks/local/doing`, `tasks/local/done`), a `misc/` directory for files not managed by banco, and generates `.banco/BANCO.md`, `AGENTS.md`, and `CLAUDE.md` for agentic workflows.
 
 ## new
 

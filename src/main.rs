@@ -285,6 +285,7 @@ fn run() -> anyhow::Result<()> {
                 }],
             })?;
             local.init(&root)?;
+            std::fs::create_dir_all(root.join("misc"))?;
             write_agent_files(&root, &local)?;
             println!("Initialized banco in {}", root.display());
         }
