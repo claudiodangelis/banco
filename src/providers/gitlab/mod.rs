@@ -9,10 +9,12 @@ use walkdir::WalkDir;
 use regex::Regex;
 
 use crate::config::ProviderEntry;
-use crate::context::ModuleContext;
+use crate::context::{Label, ModuleContext};
 use crate::module::Module;
 use crate::provider::{ConfigParam, ConfigParamKind, Provider};
 use crate::template::find_template;
+
+use crate::providers::frontmatter;
 
 use client::{GitLabClient, Issue};
 use repos::GitLabRepos;
@@ -128,12 +130,13 @@ fn format_issue(issue: &Issue) -> String {
 
 fn apply_issue(
     issue: &Issue,
-    col_dir: &Path,
+    status: &str,
+    task_dir: &Path,
     existing: &mut HashMap<u64, PathBuf>,
     template: Option<&str>,
 ) -> anyhow::Result<()> {
     let filename = format!("{:04} - {}.md", issue.iid, sanitize(&issue.title));
-    let expected = col_dir.join(&filename);
+    let expected = task_dir.join(&filename);
 
     match existing.get(&issue.iid) {
         None => {
@@ -141,16 +144,21 @@ fn apply_issue(
                 let content = template
                     .map(|t| t.to_string())
                     .unwrap_or_else(|| format_issue(issue));
-                std::fs::write(&expected, content)?;
-                existing.insert(issue.iid, expected);
+                std::fs::write(&expected, &content)?;
+                existing.insert(issue.iid, expected.clone());
             }
         }
         Some(current) => {
             if current != &expected && !expected.exists() {
                 std::fs::rename(current, &expected)?;
-                existing.insert(issue.iid, expected);
+                existing.insert(issue.iid, expected.clone());
             }
         }
+    }
+
+    let actual = existing.get(&issue.iid).cloned().unwrap_or(expected);
+    if actual.exists() {
+        frontmatter::apply(&actual, status, &issue.labels)?;
     }
     Ok(())
 }
@@ -207,10 +215,10 @@ impl Provider for GitLabProvider {
 
                 let mut existing = scan_col(&task_dir);
                 for issue in client.issues_open(project.id)? {
-                    apply_issue(&issue, &task_dir, &mut existing, tpl.as_deref())?;
+                    apply_issue(&issue, "open", &task_dir, &mut existing, tpl.as_deref())?;
                 }
                 for issue in client.issues_closed(project.id)? {
-                    apply_issue(&issue, &task_dir, &mut existing, tpl.as_deref())?;
+                    apply_issue(&issue, "closed", &task_dir, &mut existing, tpl.as_deref())?;
                 }
 
                 println!("  synced issues for {}", namespace_project);
@@ -248,9 +256,19 @@ impl Provider for GitLabProvider {
                             .file_stem()
                             .and_then(|s| s.to_str())
                             .unwrap_or(parts[1]);
+                        let fm = std::fs::read_to_string(path)
+                            .ok()
+                            .and_then(|c| frontmatter::parse(&c).0);
+                        let status = fm.as_ref().map(|f| f.status.as_str()).unwrap_or("");
+                        let tags: Vec<&str> = fm
+                            .as_ref()
+                            .map(|f| f.tags.iter().map(|t| t.as_str()).collect())
+                            .unwrap_or_default();
                         issue_items.push(json!({
                             "project": parts[0],
                             "name":    title,
+                            "status":  status,
+                            "tags":    tags,
                         }));
                     }
                 }
@@ -262,7 +280,20 @@ impl Provider for GitLabProvider {
         Ok(vec![
             ModuleContext {
                 name: "tasks".to_string(),
-                labels: vec![],
+                labels: vec![
+                    Label {
+                        name: "status".to_string(),
+                        kind: "string".to_string(),
+                        description: "Issue state".to_string(),
+                        values: Some(vec!["open".to_string(), "closed".to_string()]),
+                    },
+                    Label {
+                        name: "tags".to_string(),
+                        kind: "list".to_string(),
+                        description: "Issue labels".to_string(),
+                        values: None,
+                    },
+                ],
                 items: issue_items,
             },
             ModuleContext {

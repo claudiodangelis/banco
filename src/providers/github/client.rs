@@ -15,11 +15,17 @@ pub struct Repo {
 }
 
 #[derive(Deserialize)]
+pub struct Label {
+    pub name: String,
+}
+
+#[derive(Deserialize)]
 pub struct Issue {
     pub number: u64,
     pub title: String,
     pub body: Option<String>,
     pub pull_request: Option<Value>,
+    pub labels: Vec<Label>,
 }
 
 impl GitHubClient {

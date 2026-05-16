@@ -20,6 +20,7 @@ pub struct Issue {
     pub iid: u64,
     pub title: String,
     pub description: Option<String>,
+    pub labels: Vec<String>,
 }
 
 impl GitLabClient {
