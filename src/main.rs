@@ -455,8 +455,9 @@ fn run() -> anyhow::Result<()> {
 
             let items = &modules[module_idx].1;
 
+            let item_prompt = format!("{} item", all[provider_idx].0);
             let item_idx = FuzzySelect::with_theme(&theme)
-                .with_prompt("Item")
+                .with_prompt(&item_prompt)
                 .items(&items.iter().map(|i| i.display.as_str()).collect::<Vec<_>>())
                 .default(0)
                 .interact()?;
