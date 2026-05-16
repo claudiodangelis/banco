@@ -201,22 +201,16 @@ impl Provider for GitLabProvider {
             for namespace_project in &projects {
                 let project = client.project(namespace_project)?;
                 let task_dir = self.tasks_root(root).join(&project.path);
-                let open_col = task_dir.join("1-open");
-                let closed_col = task_dir.join("2-closed");
-                std::fs::create_dir_all(&open_col)?;
-                std::fs::create_dir_all(&closed_col)?;
+                std::fs::create_dir_all(&task_dir)?;
 
-                let open_tpl = find_template(root, &template_base, &format!("{}/1-open", project.path));
-                let closed_tpl = find_template(root, &template_base, &format!("{}/2-closed", project.path));
+                let tpl = find_template(root, &template_base, &project.path);
 
-                let mut existing_open = scan_col(&open_col);
+                let mut existing = scan_col(&task_dir);
                 for issue in client.issues_open(project.id)? {
-                    apply_issue(&issue, &open_col, &mut existing_open, open_tpl.as_deref())?;
+                    apply_issue(&issue, &task_dir, &mut existing, tpl.as_deref())?;
                 }
-
-                let mut existing_closed = scan_col(&closed_col);
                 for issue in client.issues_closed(project.id)? {
-                    apply_issue(&issue, &closed_col, &mut existing_closed, closed_tpl.as_deref())?;
+                    apply_issue(&issue, &task_dir, &mut existing, tpl.as_deref())?;
                 }
 
                 println!("  synced issues for {}", namespace_project);
@@ -236,8 +230,8 @@ impl Provider for GitLabProvider {
 
         if issues_base.exists() {
             for entry in WalkDir::new(&issues_base)
-                .min_depth(3)
-                .max_depth(3)
+                .min_depth(2)
+                .max_depth(2)
                 .into_iter()
                 .filter_map(|e| e.ok())
             {
@@ -249,15 +243,14 @@ impl Provider for GitLabProvider {
                         .and_then(|p| p.to_str())
                         .unwrap_or("");
                     let parts: Vec<&str> = rel.split('/').collect();
-                    if parts.len() == 3 {
-                        let title = Path::new(parts[2])
+                    if parts.len() == 2 {
+                        let title = Path::new(parts[1])
                             .file_stem()
                             .and_then(|s| s.to_str())
-                            .unwrap_or(parts[2]);
+                            .unwrap_or(parts[1]);
                         issue_items.push(json!({
                             "project": parts[0],
-                            "column": parts[1],
-                            "name": title,
+                            "name":    title,
                         }));
                     }
                 }

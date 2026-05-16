@@ -208,42 +208,22 @@ impl Provider for GitHubProvider {
                 let owner = owner_repo.split('/').next().unwrap_or(owner_repo);
                 let repo_name = owner_repo.rsplit('/').next().unwrap_or(owner_repo);
                 let task_dir = self.tasks_root(root).join(owner).join(repo_name);
+                std::fs::create_dir_all(&task_dir)?;
 
-                let open_col = task_dir.join("1-open");
-                let closed_col = task_dir.join("2-closed");
-                std::fs::create_dir_all(&open_col)?;
-                std::fs::create_dir_all(&closed_col)?;
+                let tpl = find_template(root, &template_base, &format!("{}/{}", owner, repo_name));
 
-                let open_tpl = find_template(
-                    root,
-                    &template_base,
-                    &format!("{}/{}/1-open", owner, repo_name),
-                );
-                let closed_tpl = find_template(
-                    root,
-                    &template_base,
-                    &format!("{}/{}/2-closed", owner, repo_name),
-                );
-
-                let mut existing_open = scan_col(&open_col);
+                let mut existing = scan_col(&task_dir);
                 for issue in client.issues_open(owner_repo)? {
                     if issue.pull_request.is_some() {
                         continue;
                     }
-                    apply_issue(&issue, &open_col, &mut existing_open, open_tpl.as_deref())?;
+                    apply_issue(&issue, &task_dir, &mut existing, tpl.as_deref())?;
                 }
-
-                let mut existing_closed = scan_col(&closed_col);
                 for issue in client.issues_closed(owner_repo)? {
                     if issue.pull_request.is_some() {
                         continue;
                     }
-                    apply_issue(
-                        &issue,
-                        &closed_col,
-                        &mut existing_closed,
-                        closed_tpl.as_deref(),
-                    )?;
+                    apply_issue(&issue, &task_dir, &mut existing, tpl.as_deref())?;
                 }
 
                 println!("  synced issues for {}", owner_repo);
@@ -263,8 +243,8 @@ impl Provider for GitHubProvider {
 
         if issues_base.exists() {
             for entry in WalkDir::new(&issues_base)
-                .min_depth(4)
-                .max_depth(4)
+                .min_depth(3)
+                .max_depth(3)
                 .into_iter()
                 .filter_map(|e| e.ok())
             {
@@ -276,16 +256,15 @@ impl Provider for GitHubProvider {
                         .and_then(|p| p.to_str())
                         .unwrap_or("");
                     let parts: Vec<&str> = rel.split('/').collect();
-                    if parts.len() == 4 {
-                        let title = Path::new(parts[3])
+                    if parts.len() == 3 {
+                        let title = Path::new(parts[2])
                             .file_stem()
                             .and_then(|s| s.to_str())
-                            .unwrap_or(parts[3]);
+                            .unwrap_or(parts[2]);
                         issue_items.push(json!({
-                            "owner":  parts[0],
-                            "repo":   parts[1],
-                            "column": parts[2],
-                            "name":   title,
+                            "owner": parts[0],
+                            "repo":  parts[1],
+                            "name":  title,
                         }));
                     }
                 }
