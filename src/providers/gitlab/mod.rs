@@ -10,11 +10,12 @@ use regex::Regex;
 
 use crate::config::ProviderEntry;
 use crate::context::{Label, ModuleContext};
-use crate::module::Module;
+use crate::module::{BrowseItem, Module};
 use crate::provider::{ConfigParam, ConfigParamKind, Provider};
 use crate::template::find_template;
 
 use crate::providers::frontmatter;
+use crate::providers::git::{normalize_git_url, read_git_remote_url};
 
 use client::{GitLabClient, Issue};
 use repos::GitLabRepos;
@@ -230,6 +231,83 @@ impl Provider for GitLabProvider {
         }
 
         Ok(())
+    }
+
+    fn browse_modules(&self, root: &Path) -> anyhow::Result<Vec<(String, Vec<BrowseItem>)>> {
+        let mut result = Vec::new();
+
+        // Repos: read git remote origin from each cloned repo; also build a
+        // project_name -> base_url map so task URLs can be derived from it.
+        let repos_base = self.repos_root(root);
+        let mut repo_url_map: HashMap<String, String> = HashMap::new();
+        let mut repo_items: Vec<BrowseItem> = Vec::new();
+        if repos_base.exists() {
+            let mut entries: Vec<_> = std::fs::read_dir(&repos_base)?
+                .filter_map(|e| e.ok())
+                .collect();
+            entries.sort_by_key(|e| e.file_name());
+            for entry in entries {
+                let path = entry.path();
+                if path.is_dir() {
+                    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                    if let Some(remote_url) = read_git_remote_url(&path) {
+                        let base = normalize_git_url(&remote_url);
+                        repo_url_map.insert(name.clone(), base.clone());
+                        repo_items.push(BrowseItem {
+                            display: name,
+                            pages: vec![
+                                ("Repository".to_string(),     base.clone()),
+                                ("Merge Requests".to_string(), format!("{}/-/merge_requests", base)),
+                                ("Pipelines".to_string(),      format!("{}/-/pipelines", base)),
+                            ],
+                        });
+                    }
+                }
+            }
+        }
+        if !repo_items.is_empty() {
+            result.push(("repos".to_string(), repo_items));
+        }
+
+        // Tasks: derive issue URL from tasks/{provider}/{project}/{n} - {title}.md.
+        // Namespace is resolved via the cloned repo's remote URL; skip items where
+        // no matching repo is found (namespace would be unknown).
+        let tasks_base = self.tasks_root(root);
+        let mut task_items: Vec<BrowseItem> = Vec::new();
+        if tasks_base.exists() {
+            for entry in WalkDir::new(&tasks_base)
+                .min_depth(2).max_depth(2)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                let path = entry.path();
+                if path.is_file() && path.extension().map_or(false, |e| e == "md") {
+                    let rel = path.strip_prefix(&tasks_base).ok()
+                        .and_then(|p| p.to_str()).unwrap_or("");
+                    let parts: Vec<&str> = rel.split('/').collect();
+                    if parts.len() == 2 {
+                        let project = parts[0];
+                        let stem = Path::new(parts[1]).file_stem()
+                            .and_then(|s| s.to_str()).unwrap_or(parts[1]);
+                        let mut split = stem.splitn(2, " - ");
+                        if let (Some(num_str), Some(title)) = (split.next(), split.next()) {
+                            if let Ok(num) = num_str.trim().parse::<u64>() {
+                                if let Some(base_url) = repo_url_map.get(project) {
+                                    let display = format!("{} #{} {}", project, num, title);
+                                    let url = format!("{}/-/issues/{}", base_url, num);
+                                    task_items.push(BrowseItem::default_page(display, url));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if !task_items.is_empty() {
+            result.push(("tasks".to_string(), task_items));
+        }
+
+        Ok(result)
     }
 
     fn context(&self, root: &Path) -> anyhow::Result<Vec<ModuleContext>> {
