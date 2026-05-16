@@ -24,7 +24,7 @@ pub trait Provider {
         Ok(())
     }
 
-    fn browse_items(&self, _root: &Path) -> anyhow::Result<Vec<(String, String)>> {
+    fn browse_modules(&self, _root: &Path) -> anyhow::Result<Vec<(String, Vec<(String, String)>)>> {
         Ok(vec![])
     }
 }

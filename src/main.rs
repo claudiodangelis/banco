@@ -411,47 +411,60 @@ fn run() -> anyhow::Result<()> {
         Commands::Browse => {
             let theme = ColorfulTheme::default();
 
-            let mut provider_bookmarks: Vec<(String, Vec<(String, String)>)> = Vec::new();
+            let mut all: Vec<(String, Vec<(String, Vec<(String, String)>)>)> = Vec::new();
 
-            let local_items = local.browse_items(&root)?;
-            if !local_items.is_empty() {
-                provider_bookmarks.push(("local".to_string(), local_items));
+            let local_modules = local.browse_modules(&root)?;
+            if !local_modules.is_empty() {
+                all.push(("local".to_string(), local_modules));
             }
-
             for p in remote_providers(&root)? {
-                let items = p.browse_items(&root)?;
-                if !items.is_empty() {
-                    provider_bookmarks.push((p.name().to_string(), items));
+                let modules = p.browse_modules(&root)?;
+                if !modules.is_empty() {
+                    all.push((p.name().to_string(), modules));
                 }
             }
 
-            if provider_bookmarks.is_empty() {
-                anyhow::bail!("no bookmarks found");
+            if all.is_empty() {
+                anyhow::bail!("no browseable items found");
             }
 
-            let bookmarks = if provider_bookmarks.len() > 1 {
-                let names: Vec<&str> = provider_bookmarks.iter().map(|(n, _)| n.as_str()).collect();
-                let idx = dialoguer::Select::with_theme(&theme)
+            let provider_idx = if all.len() > 1 {
+                let names: Vec<&str> = all.iter().map(|(n, _)| n.as_str()).collect();
+                dialoguer::Select::with_theme(&theme)
                     .with_prompt("Provider")
                     .items(&names)
                     .default(0)
-                    .interact()?;
-                &provider_bookmarks[idx].1
+                    .interact()?
             } else {
-                &provider_bookmarks[0].1
+                0
             };
 
-            let display: Vec<String> = bookmarks.iter()
+            let modules = &all[provider_idx].1;
+
+            let module_idx = if modules.len() > 1 {
+                let names: Vec<&str> = modules.iter().map(|(n, _)| n.as_str()).collect();
+                dialoguer::Select::with_theme(&theme)
+                    .with_prompt("Module")
+                    .items(&names)
+                    .default(0)
+                    .interact()?
+            } else {
+                0
+            };
+
+            let items = &modules[module_idx].1;
+
+            let display: Vec<String> = items.iter()
                 .map(|(name, url)| format!("{} — {}", name, url))
                 .collect();
 
             let idx = FuzzySelect::with_theme(&theme)
-                .with_prompt("Bookmark")
+                .with_prompt("Item")
                 .items(&display)
                 .default(0)
                 .interact()?;
 
-            open_browser(&bookmarks[idx].1)?;
+            open_browser(&items[idx].1)?;
         }
         Commands::Provider { action } => match action {
             ProviderAction::Add => {
