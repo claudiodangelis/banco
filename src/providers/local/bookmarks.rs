@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use walkdir::WalkDir;
 
 use crate::context::Label;
-use crate::module::Module;
+use crate::module::{BrowseItem, Module};
 use super::util::{find_template, label_template_paths};
 
 pub struct Bookmarks;
@@ -74,7 +74,7 @@ Subdirectories act as labels/tags and can be nested.\
         Ok(path)
     }
 
-    fn browse_items(&self, root: &Path) -> anyhow::Result<Vec<(String, String)>> {
+    fn browse_items(&self, root: &Path) -> anyhow::Result<Vec<BrowseItem>> {
         let base = root.join("bookmarks/local");
         if !base.exists() {
             return Ok(vec![]);
@@ -97,12 +97,8 @@ Subdirectories act as labels/tags and can be nested.\
                 if url.is_empty() {
                     continue;
                 }
-                let display = if label.is_empty() {
-                    name
-                } else {
-                    format!("{}/{}", label, name)
-                };
-                items.push((display, url));
+                let display = if label.is_empty() { name } else { format!("{}/{}", label, name) };
+                items.push(BrowseItem::default_page(display, url));
             }
         }
         Ok(items)

@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::context::ModuleContext;
+use crate::module::BrowseItem;
 
 pub struct ConfigParam {
     pub name: &'static str,
@@ -24,7 +25,7 @@ pub trait Provider {
         Ok(())
     }
 
-    fn browse_modules(&self, _root: &Path) -> anyhow::Result<Vec<(String, Vec<(String, String)>)>> {
+    fn browse_modules(&self, _root: &Path) -> anyhow::Result<Vec<(String, Vec<BrowseItem>)>> {
         Ok(vec![])
     }
 }

@@ -19,6 +19,7 @@ use clap_complete::generate;
 
 use cli::{Cli, Commands, ProviderAction};
 use dialoguer::FuzzySelect;
+use module::BrowseItem;
 use context::{ContextOutput, ProviderContext};
 use provider::Provider;
 use providers::local::LocalProvider;
@@ -411,7 +412,7 @@ fn run() -> anyhow::Result<()> {
         Commands::Browse => {
             let theme = ColorfulTheme::default();
 
-            let mut all: Vec<(String, Vec<(String, Vec<(String, String)>)>)> = Vec::new();
+            let mut all: Vec<(String, Vec<(String, Vec<BrowseItem>)>)> = Vec::new();
 
             let local_modules = local.browse_modules(&root)?;
             if !local_modules.is_empty() {
@@ -454,17 +455,27 @@ fn run() -> anyhow::Result<()> {
 
             let items = &modules[module_idx].1;
 
-            let display: Vec<String> = items.iter()
-                .map(|(name, url)| format!("{} — {}", name, url))
-                .collect();
-
-            let idx = FuzzySelect::with_theme(&theme)
+            let item_idx = FuzzySelect::with_theme(&theme)
                 .with_prompt("Item")
-                .items(&display)
+                .items(&items.iter().map(|i| i.display.as_str()).collect::<Vec<_>>())
                 .default(0)
                 .interact()?;
 
-            open_browser(&items[idx].1)?;
+            let item = &items[item_idx];
+
+            let url = if item.pages.len() == 1 {
+                &item.pages[0].1
+            } else {
+                let page_names: Vec<&str> = item.pages.iter().map(|(n, _)| n.as_str()).collect();
+                let page_idx = dialoguer::Select::with_theme(&theme)
+                    .with_prompt("Page")
+                    .items(&page_names)
+                    .default(0)
+                    .interact()?;
+                &item.pages[page_idx].1
+            };
+
+            open_browser(url)?;
         }
         Commands::Provider { action } => match action {
             ProviderAction::Add => {

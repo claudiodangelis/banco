@@ -7,7 +7,7 @@ mod util;
 use std::path::Path;
 
 use crate::context::ModuleContext;
-use crate::module::Module;
+use crate::module::{BrowseItem, Module};
 use crate::provider::Provider;
 
 pub struct LocalProvider {
@@ -59,7 +59,7 @@ impl Provider for LocalProvider {
             .collect()
     }
 
-    fn browse_modules(&self, root: &Path) -> anyhow::Result<Vec<(String, Vec<(String, String)>)>> {
+    fn browse_modules(&self, root: &Path) -> anyhow::Result<Vec<(String, Vec<BrowseItem>)>> {
         let mut result = Vec::new();
         for module in &self.modules {
             let items = module.browse_items(root)?;
