@@ -19,6 +19,7 @@ Banco supports agentic workflows. Upon initialization, three files are created f
 - Run `banco context` first to get a JSON snapshot of the project state (providers, modules, items, and the labels required to build commands)
 - Always use `banco new` to create items — never write files directly
 - Derive label names and values from the context rather than guessing
+- Use `status` and `tags` metadata on synced provider items to make informed decisions — e.g. prioritize open issues, filter by label, skip closed tasks when working on active work
 
 Example prompts:
 
@@ -64,9 +65,7 @@ Provider configuration is stored in `.banco/config.yml` within the project direc
 └── tasks
     ├── gitlab
     │   └── my-project
-    │       ├── 1-open
-    │       │   └── 0042 - Fix login bug.md
-    │       └── 2-closed
+    │       └── 0042 - Fix login bug.md
     └── local
         ├── backlog
         │   └── 0003 - Write full specs.md
@@ -94,8 +93,7 @@ The local provider is enabled by default and added to `.banco/config.yml` automa
 ## gitlab
 
 The GitLab provider syncs tasks (issues) and repositories from configured GitLab projects into
-the local filesystem. Issues are organized by open/closed state; repositories are cloned via SSH
-and kept up to date with `git fetch`.
+the local filesystem. Repositories are cloned via SSH and kept up to date with `git fetch`.
 
 **Configuration parameters** (set interactively via `banco provider add`):
 
@@ -111,32 +109,39 @@ and kept up to date with `git fetch`.
 
 **Directory structure:**
 
-Tasks are organized under `tasks/<provider>/`:
+Tasks are synced flat under `tasks/<provider>/<project>/`:
 
 ```
 tasks/
 └── gitlab/
     └── my-project/
-        ├── 1-open/
-        │   └── 0042 - Fix login bug.md
-        └── 2-closed/
+        └── 0042 - Fix login bug.md
 ```
 
-Each task file contains the issue title and description:
+Each task file carries a YAML frontmatter block followed by the issue title and description:
 
 ```markdown
+---
+status: open
+tags:
+  - bug
+---
+
 # Fix login bug
 
 Description here...
 ```
+
+`status` is `open` or `closed`. `tags` mirrors the issue's labels on GitLab. Both fields are
+updated automatically on each `banco sync` without touching the rest of the file.
 
 Repos from configured projects are cloned under `repos/<provider>/`.
 
 ## github
 
 The GitHub provider syncs tasks (issues) and repositories from configured GitHub projects into
-the local filesystem. Issues are organized by open/closed state; repositories are cloned via SSH
-and kept up to date with `git fetch`. Pull requests are excluded from tasks.
+the local filesystem. Repositories are cloned via SSH and kept up to date with `git fetch`.
+Pull requests are excluded from tasks.
 
 **Configuration parameters** (set interactively via `banco provider add`):
 
@@ -152,17 +157,32 @@ and kept up to date with `git fetch`. Pull requests are excluded from tasks.
 
 **Directory structure:**
 
-Tasks are organized under `tasks/<provider>/`:
+Tasks are synced flat under `tasks/<provider>/<owner>/<repo>/`:
 
 ```
 tasks/
 └── github/
     └── myorg/
         └── my-project/
-            ├── 1-open/
-            │   └── 0042 - Fix login bug.md
-            └── 2-closed/
+            └── 0042 - Fix login bug.md
 ```
+
+Each task file carries a YAML frontmatter block followed by the issue title and description:
+
+```markdown
+---
+status: open
+tags:
+  - bug
+---
+
+# Fix login bug
+
+Description here...
+```
+
+`status` is `open` or `closed`. `tags` mirrors the issue's labels on GitHub. Both fields are
+updated automatically on each `banco sync` without touching the rest of the file.
 
 Repos are cloned under `repos/<provider>/`.
 
@@ -272,12 +292,12 @@ Sync is non-destructive: it never deletes or overwrites existing files.
 
 **Tasks (issues):**
 
-| Situation                         | Action                                                           |
-| --------------------------------- | ---------------------------------------------------------------- |
-| Issue not yet on disk             | Creates a new file with initial content                          |
-| Issue title changed               | Renames the file; content is untouched                           |
-| Issue moved to a different column | Moves the file to the new column directory; content is untouched |
-| Issue unchanged                   | Does nothing                                                     |
+| Situation                      | Action                                                  |
+| ------------------------------ | ------------------------------------------------------- |
+| Issue not yet on disk          | Creates a new file with frontmatter and initial content |
+| Issue title changed            | Renames the file; body content is untouched             |
+| Status or labels changed       | Updates frontmatter block; body content is untouched    |
+| Issue unchanged                | Does nothing                                            |
 
 **Repos:**
 
