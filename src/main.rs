@@ -431,7 +431,7 @@ fn run() -> anyhow::Result<()> {
 
             let provider_idx = if all.len() > 1 {
                 let names: Vec<&str> = all.iter().map(|(n, _)| n.as_str()).collect();
-                dialoguer::Select::with_theme(&theme)
+                FuzzySelect::with_theme(&theme)
                     .with_prompt("Provider")
                     .items(&names)
                     .default(0)
@@ -444,7 +444,7 @@ fn run() -> anyhow::Result<()> {
 
             let module_idx = if modules.len() > 1 {
                 let names: Vec<&str> = modules.iter().map(|(n, _)| n.as_str()).collect();
-                dialoguer::Select::with_theme(&theme)
+                FuzzySelect::with_theme(&theme)
                     .with_prompt("Module")
                     .items(&names)
                     .default(0)
@@ -467,7 +467,7 @@ fn run() -> anyhow::Result<()> {
                 &item.pages[0].1
             } else {
                 let page_names: Vec<&str> = item.pages.iter().map(|(n, _)| n.as_str()).collect();
-                let page_idx = dialoguer::Select::with_theme(&theme)
+                let page_idx = FuzzySelect::with_theme(&theme)
                     .with_prompt("Page")
                     .items(&page_names)
                     .default(0)
