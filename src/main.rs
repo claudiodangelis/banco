@@ -18,6 +18,7 @@ use clap::CommandFactory;
 use clap_complete::generate;
 
 use cli::{Cli, Commands, ProviderAction};
+use dialoguer::FuzzySelect;
 use context::{ContextOutput, ProviderContext};
 use provider::Provider;
 use providers::local::LocalProvider;
@@ -141,6 +142,45 @@ banco sync github    # sync a specific provider by name or alias\n\
         std::fs::write(&claude_path, "@AGENTS.md\n")?;
     }
     Ok(())
+}
+
+fn open_browser(url: &str) -> anyhow::Result<()> {
+    if let Ok(browser) = std::env::var("BROWSER") {
+        std::process::Command::new(&browser)
+            .arg(url)
+            .status()
+            .with_context(|| format!("failed to launch browser '{}'", browser))?;
+        return Ok(());
+    }
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open").arg(url).status().context("failed to open browser")?;
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open").arg(url).status().context("failed to open browser")?;
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("cmd").args(["/c", "start", url]).status().context("failed to open browser")?;
+    Ok(())
+}
+
+fn bookmarks_for_provider(ctx: &[crate::context::ModuleContext]) -> Vec<(String, String)> {
+    ctx.iter()
+        .find(|m| m.name == "bookmarks")
+        .map(|m| {
+            m.items.iter()
+                .filter_map(|item| {
+                    let name = item["name"].as_str()?.to_string();
+                    let label = item["label"].as_str().unwrap_or("").to_string();
+                    let url = item["url"].as_str()?.to_string();
+                    if url.is_empty() { return None; }
+                    let display_name = if label.is_empty() {
+                        name
+                    } else {
+                        format!("{}/{}", label, name)
+                    };
+                    Some((display_name, url))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab"];
@@ -388,6 +428,53 @@ fn run() -> anyhow::Result<()> {
             let mut cmd = Cli::command();
             let bin_name = cmd.get_name().to_string();
             generate(shell, &mut cmd, bin_name, &mut std::io::stdout());
+        }
+        Commands::Browse => {
+            let theme = ColorfulTheme::default();
+
+            let mut provider_bookmarks: Vec<(String, Vec<(String, String)>)> = Vec::new();
+
+            let local_ctx = local.context(&root)?;
+            let local_bm = bookmarks_for_provider(&local_ctx);
+            if !local_bm.is_empty() {
+                provider_bookmarks.push(("local".to_string(), local_bm));
+            }
+
+            for p in remote_providers(&root)? {
+                let ctx = p.context(&root)?;
+                let bm = bookmarks_for_provider(&ctx);
+                if !bm.is_empty() {
+                    provider_bookmarks.push((p.name().to_string(), bm));
+                }
+            }
+
+            if provider_bookmarks.is_empty() {
+                anyhow::bail!("no bookmarks found");
+            }
+
+            let bookmarks = if provider_bookmarks.len() > 1 {
+                let names: Vec<&str> = provider_bookmarks.iter().map(|(n, _)| n.as_str()).collect();
+                let idx = dialoguer::Select::with_theme(&theme)
+                    .with_prompt("Provider")
+                    .items(&names)
+                    .default(0)
+                    .interact()?;
+                &provider_bookmarks[idx].1
+            } else {
+                &provider_bookmarks[0].1
+            };
+
+            let display: Vec<String> = bookmarks.iter()
+                .map(|(name, url)| format!("{} — {}", name, url))
+                .collect();
+
+            let idx = FuzzySelect::with_theme(&theme)
+                .with_prompt("Bookmark")
+                .items(&display)
+                .default(0)
+                .interact()?;
+
+            open_browser(&bookmarks[idx].1)?;
         }
         Commands::Provider { action } => match action {
             ProviderAction::Add => {

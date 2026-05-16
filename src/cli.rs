@@ -47,6 +47,8 @@ pub enum Commands {
         /// Shell to generate completions for
         shell: Shell,
     },
+    /// Browse bookmarks with a fuzzy finder and open in the default browser
+    Browse,
 }
 
 #[derive(Subcommand)]
