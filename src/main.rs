@@ -66,9 +66,17 @@ banco context\n\
 The output contains:\n\n\
 - **providers** — the list of active providers (local, github, gitlab, …)\n\
 - **modules** — each provider's modules (tasks, notes, bookmarks, repos)\n\
-- **labels** — the parameters accepted by each module, including the allowed \
-values for `enum` labels\n\
-- **items** — the current list of items in each module\n\n\
+- **labels** — the schema of metadata fields available on each module's items\n\
+- **items** — the current list of items in each module, each carrying its \
+metadata fields\n\n\
+Items synced from remote providers (GitHub, GitLab) include a **metadata** \
+block with the following fields:\n\n\
+- `status` — current state of the item (`open` or `closed`)\n\
+- `tags` — labels attached to the item on the remote\n\n\
+Use these fields to make informed decisions: prioritize open items, filter by \
+tag, skip closed issues when the task is about active work, etc. The `labels` \
+array on each module lists every available field and its allowed values — \
+always read it before filtering or sorting items.\n\n\
 Read the context every time before answering questions about the project state \
 or before constructing any command. Never assume the state from memory alone.\n\n\
 ### 2. Never create or move files directly\n\n\
