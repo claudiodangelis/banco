@@ -74,6 +74,40 @@ Subdirectories act as labels/tags and can be nested.\
         Ok(path)
     }
 
+    fn browse_items(&self, root: &Path) -> anyhow::Result<Vec<(String, String)>> {
+        let base = root.join("bookmarks/local");
+        if !base.exists() {
+            return Ok(vec![]);
+        }
+        let mut items = Vec::new();
+        for entry in WalkDir::new(&base).min_depth(1).into_iter().filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_file() && path.extension().map_or(false, |e| e == "md") {
+                let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                let label = path
+                    .parent()
+                    .and_then(|p| p.strip_prefix(&base).ok())
+                    .and_then(|p| p.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                let url = std::fs::read_to_string(path)
+                    .ok()
+                    .and_then(|c| c.lines().next().map(|l| l.to_string()))
+                    .unwrap_or_default();
+                if url.is_empty() {
+                    continue;
+                }
+                let display = if label.is_empty() {
+                    name
+                } else {
+                    format!("{}/{}", label, name)
+                };
+                items.push((display, url));
+            }
+        }
+        Ok(items)
+    }
+
     fn context(&self, root: &Path) -> anyhow::Result<Vec<Value>> {
         let base = root.join("bookmarks/local");
         if !base.exists() {

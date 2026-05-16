@@ -58,4 +58,12 @@ impl Provider for LocalProvider {
             })
             .collect()
     }
+
+    fn browse_items(&self, root: &Path) -> anyhow::Result<Vec<(String, String)>> {
+        let mut items = Vec::new();
+        for module in &self.modules {
+            items.extend(module.browse_items(root)?);
+        }
+        Ok(items)
+    }
 }

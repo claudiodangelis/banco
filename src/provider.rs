@@ -23,4 +23,8 @@ pub trait Provider {
     fn sync(&self, _root: &Path) -> anyhow::Result<()> {
         Ok(())
     }
+
+    fn browse_items(&self, _root: &Path) -> anyhow::Result<Vec<(String, String)>> {
+        Ok(vec![])
+    }
 }

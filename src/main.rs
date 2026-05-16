@@ -161,27 +161,6 @@ fn open_browser(url: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn bookmarks_for_provider(ctx: &[crate::context::ModuleContext]) -> Vec<(String, String)> {
-    ctx.iter()
-        .find(|m| m.name == "bookmarks")
-        .map(|m| {
-            m.items.iter()
-                .filter_map(|item| {
-                    let name = item["name"].as_str()?.to_string();
-                    let label = item["label"].as_str().unwrap_or("").to_string();
-                    let url = item["url"].as_str()?.to_string();
-                    if url.is_empty() { return None; }
-                    let display_name = if label.is_empty() {
-                        name
-                    } else {
-                        format!("{}/{}", label, name)
-                    };
-                    Some((display_name, url))
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
 
 const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab"];
 
@@ -434,17 +413,15 @@ fn run() -> anyhow::Result<()> {
 
             let mut provider_bookmarks: Vec<(String, Vec<(String, String)>)> = Vec::new();
 
-            let local_ctx = local.context(&root)?;
-            let local_bm = bookmarks_for_provider(&local_ctx);
-            if !local_bm.is_empty() {
-                provider_bookmarks.push(("local".to_string(), local_bm));
+            let local_items = local.browse_items(&root)?;
+            if !local_items.is_empty() {
+                provider_bookmarks.push(("local".to_string(), local_items));
             }
 
             for p in remote_providers(&root)? {
-                let ctx = p.context(&root)?;
-                let bm = bookmarks_for_provider(&ctx);
-                if !bm.is_empty() {
-                    provider_bookmarks.push((p.name().to_string(), bm));
+                let items = p.browse_items(&root)?;
+                if !items.is_empty() {
+                    provider_bookmarks.push((p.name().to_string(), items));
                 }
             }
 

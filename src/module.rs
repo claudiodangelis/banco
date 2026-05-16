@@ -12,4 +12,8 @@ pub trait Module {
     fn init(&self, root: &Path) -> anyhow::Result<()>;
     fn create(&self, root: &Path, name: &str, params: &HashMap<String, String>) -> anyhow::Result<PathBuf>;
     fn context(&self, root: &Path) -> anyhow::Result<Vec<serde_json::Value>>;
+
+    fn browse_items(&self, _root: &Path) -> anyhow::Result<Vec<(String, String)>> {
+        Ok(vec![])
+    }
 }
