@@ -2,3 +2,6 @@
 title = "banco"
 authors = ["Claudio d'Angelis"]
 language = "en"
+
+[output.html]
+site-url = "/banco/"
