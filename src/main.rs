@@ -4,6 +4,7 @@ mod context;
 mod module;
 mod provider;
 mod providers;
+mod sync_state;
 mod template;
 mod tui;
 
@@ -25,6 +26,7 @@ use provider::Provider;
 use providers::local::LocalProvider;
 use providers::github::GitHubProvider;
 use providers::gitlab::GitLabProvider;
+use providers::jira::JiraProvider;
 
 fn parse_labels(raw: &[String]) -> anyhow::Result<HashMap<String, String>> {
     raw.iter()
@@ -163,7 +165,7 @@ fn open_browser(url: &str) -> anyhow::Result<()> {
 }
 
 
-const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab"];
+const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab", "jira"];
 
 fn provider_add(root: &Path) -> anyhow::Result<()> {
     let theme = ColorfulTheme::default();
@@ -198,6 +200,7 @@ fn provider_add(root: &Path) -> anyhow::Result<()> {
     let schema = match name {
         "github" => GitHubProvider::available_config_schema(),
         "gitlab" => GitLabProvider::available_config_schema(),
+        "jira"   => JiraProvider::available_config_schema(),
         _ => vec![],
     };
 
@@ -285,6 +288,7 @@ fn remote_providers(root: &Path) -> anyhow::Result<Vec<Box<dyn Provider>>> {
         match entry.name.as_str() {
             "github" => providers.push(Box::new(GitHubProvider::new(entry))),
             "gitlab" => providers.push(Box::new(GitLabProvider::new(entry))),
+            "jira"   => providers.push(Box::new(JiraProvider::new(entry))),
             _ => {}
         }
     }
@@ -399,6 +403,7 @@ fn run() -> anyhow::Result<()> {
             if to_sync.is_empty() {
                 anyhow::bail!("no provider named '{}'", provider.unwrap());
             }
+            sync_state::ensure_dir(&root)?;
             for p in to_sync {
                 println!("Syncing {}...", p.name());
                 p.sync(&root)?;
