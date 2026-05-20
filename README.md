@@ -1,5 +1,9 @@
 # Banco
 
+[![CI](https://github.com/claudiodangelis/banco/actions/workflows/ci.yml/badge.svg)](https://github.com/claudiodangelis/banco/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/banco)](https://crates.io/crates/banco)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 Banco Management System, or simply **Banco**, is an opinionated project management tool for the
 command line that helps you **organize notes, tasks, bookmarks and documents** for your projects.
 
