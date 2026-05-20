@@ -13,6 +13,7 @@ use crate::config::ProviderEntry;
 use crate::context::{Label, ModuleContext};
 use crate::module::{BrowseItem, Module};
 use crate::provider::{ConfigParam, ConfigParamKind, Provider};
+use crate::sync_state;
 use crate::template::find_template;
 
 use crate::providers::frontmatter;
@@ -212,7 +213,9 @@ impl Provider for GitHubProvider {
         let projects = self.resolved_projects(&client)?;
 
         let sync_issues = self.entry.get_bool("sync_issues", true);
-        let template_base = format!("tasks/{}", self.entry.display_name());
+        let template_base = "tasks";
+        let since = sync_state::read(root, self.entry.display_name());
+        let synced_at = sync_state::now();
 
         if sync_issues {
             for owner_repo in &projects {
@@ -221,16 +224,16 @@ impl Provider for GitHubProvider {
                 let task_dir = self.tasks_root(root).join(owner).join(repo_name);
                 std::fs::create_dir_all(&task_dir)?;
 
-                let tpl = find_template(root, &template_base, &format!("{}/{}", owner, repo_name));
+                let tpl = find_template(root, template_base, &format!("{}/{}/{}", self.entry.display_name(), owner, repo_name));
 
                 let mut existing = scan_col(&task_dir);
-                for issue in client.issues_open(owner_repo)? {
+                for issue in client.issues_open(owner_repo, since.as_deref())? {
                     if issue.pull_request.is_some() {
                         continue;
                     }
                     apply_issue(&issue, "open", &task_dir, &mut existing, tpl.as_deref())?;
                 }
-                for issue in client.issues_closed(owner_repo)? {
+                for issue in client.issues_closed(owner_repo, since.as_deref())? {
                     if issue.pull_request.is_some() {
                         continue;
                     }
@@ -245,6 +248,7 @@ impl Provider for GitHubProvider {
             self.github_repos(root).sync(&client, &projects)?;
         }
 
+        sync_state::write(root, self.entry.display_name(), &synced_at)?;
         Ok(())
     }
 

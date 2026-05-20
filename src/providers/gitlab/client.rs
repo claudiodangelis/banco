@@ -84,17 +84,19 @@ impl GitLabClient {
         Ok(resp.json()?)
     }
 
-    pub fn issues_open(&self, project_id: u64) -> anyhow::Result<Vec<Issue>> {
-        self.get_paged(
-            &format!("/projects/{}/issues", project_id),
-            &[("state", "opened"), ("scope", "all")],
-        )
+    pub fn issues_open(&self, project_id: u64, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
+        self.issues(project_id, "opened", since)
     }
 
-    pub fn issues_closed(&self, project_id: u64) -> anyhow::Result<Vec<Issue>> {
-        self.get_paged(
-            &format!("/projects/{}/issues", project_id),
-            &[("state", "closed"), ("scope", "all")],
-        )
+    pub fn issues_closed(&self, project_id: u64, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
+        self.issues(project_id, "closed", since)
+    }
+
+    fn issues(&self, project_id: u64, state: &str, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
+        let path = format!("/projects/{}/issues", project_id);
+        match since {
+            Some(ts) => self.get_paged(&path, &[("state", state), ("scope", "all"), ("updated_after", ts)]),
+            None     => self.get_paged(&path, &[("state", state), ("scope", "all")]),
+        }
     }
 }

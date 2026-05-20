@@ -12,6 +12,7 @@ use crate::config::ProviderEntry;
 use crate::context::{Label, ModuleContext};
 use crate::module::{BrowseItem, Module};
 use crate::provider::{ConfigParam, ConfigParamKind, Provider};
+use crate::sync_state;
 use crate::template::find_template;
 
 use crate::providers::frontmatter;
@@ -204,7 +205,9 @@ impl Provider for GitLabProvider {
         let client = self.client();
         let projects = self.resolved_projects(&client)?;
         let sync_issues = self.entry.get_bool("sync_issues", true);
-        let template_base = format!("tasks/{}", self.entry.display_name());
+        let template_base = "tasks";
+        let since = sync_state::read(root, self.entry.display_name());
+        let synced_at = sync_state::now();
 
         if sync_issues {
             for namespace_project in &projects {
@@ -212,13 +215,13 @@ impl Provider for GitLabProvider {
                 let task_dir = self.tasks_root(root).join(&project.path);
                 std::fs::create_dir_all(&task_dir)?;
 
-                let tpl = find_template(root, &template_base, &project.path);
+                let tpl = find_template(root, template_base, &format!("{}/{}", self.entry.display_name(), project.path));
 
                 let mut existing = scan_col(&task_dir);
-                for issue in client.issues_open(project.id)? {
+                for issue in client.issues_open(project.id, since.as_deref())? {
                     apply_issue(&issue, "open", &task_dir, &mut existing, tpl.as_deref())?;
                 }
-                for issue in client.issues_closed(project.id)? {
+                for issue in client.issues_closed(project.id, since.as_deref())? {
                     apply_issue(&issue, "closed", &task_dir, &mut existing, tpl.as_deref())?;
                 }
 
@@ -230,6 +233,7 @@ impl Provider for GitLabProvider {
             self.gitlab_repos(root).sync(&client, &projects)?;
         }
 
+        sync_state::write(root, self.entry.display_name(), &synced_at)?;
         Ok(())
     }
 

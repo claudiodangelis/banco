@@ -94,17 +94,19 @@ impl GitHubClient {
         )
     }
 
-    pub fn issues_open(&self, owner_repo: &str) -> anyhow::Result<Vec<Issue>> {
-        self.get_paged(
-            &format!("/repos/{}/issues", owner_repo),
-            &[("state", "open")],
-        )
+    pub fn issues_open(&self, owner_repo: &str, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
+        self.issues(owner_repo, "open", since)
     }
 
-    pub fn issues_closed(&self, owner_repo: &str) -> anyhow::Result<Vec<Issue>> {
-        self.get_paged(
-            &format!("/repos/{}/issues", owner_repo),
-            &[("state", "closed")],
-        )
+    pub fn issues_closed(&self, owner_repo: &str, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
+        self.issues(owner_repo, "closed", since)
+    }
+
+    fn issues(&self, owner_repo: &str, state: &str, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
+        let path = format!("/repos/{}/issues", owner_repo);
+        match since {
+            Some(ts) => self.get_paged(&path, &[("state", state), ("since", ts)]),
+            None     => self.get_paged(&path, &[("state", state)]),
+        }
     }
 }
