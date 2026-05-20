@@ -9,6 +9,15 @@ banco sync <name>       # sync a specific provider by name or alias
 
 Sync is non-destructive: it never deletes or overwrites existing files.
 
+## Incremental sync
+
+After each successful sync, banco writes a timestamp to `.banco/sync-state/<provider>`. On the
+next run, only items updated since that timestamp are fetched — making subsequent syncs
+significantly faster on large projects.
+
+The first sync (or any sync where the state file is absent) always fetches everything. The state
+file is only written on success, so a failed sync will retry the full window on the next run.
+
 ## Tasks (issues)
 
 | Situation                | Action                                                  |
