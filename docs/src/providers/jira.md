@@ -26,6 +26,32 @@ Set interactively via `banco provider add`.
 By default, only issues **assigned to the calling user** and **not in Done status** are synced.
 There are no config fields for these — they are built-in defaults.
 
+### Example configuration
+
+```yaml
+providers:
+  - name: jira
+    config:
+      host: https://yourorg.atlassian.net
+      project: ENG
+      agent_backend: claude
+```
+
+With labels filter and an alias (useful when syncing multiple projects):
+
+```yaml
+providers:
+  - name: jira
+    alias: jira-sre
+    config:
+      host: https://yourorg.atlassian.net
+      project: OPS
+      labels:
+        - SRE
+        - platform
+      agent_backend: claude
+```
+
 ## Directory structure
 
 Tasks are synced flat under `tasks/<provider>/`:
