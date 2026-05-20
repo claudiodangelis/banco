@@ -11,7 +11,11 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize banco in the current directory
-    Init,
+    Init {
+        /// Overwrite .banco/BANCO.md in an existing project
+        #[arg(long)]
+        update: bool,
+    },
     /// Create a new item
     New {
         /// Module name (note, task)

@@ -208,25 +208,33 @@ fn run() -> anyhow::Result<()> {
     let local = LocalProvider::new();
 
     match cli.command {
-        Commands::Init => {
+        Commands::Init { update } => {
             let banco_dir = root.join(".banco");
-            let is_empty = std::fs::read_dir(&root)?.next().is_none();
-            if !is_empty {
-                anyhow::bail!("directory is not empty");
+            if update {
+                if !banco_dir.exists() {
+                    anyhow::bail!("not a banco project; run `banco init` first");
+                }
+                write_agent_files(&root, &local)?;
+                println!("Updated .banco/BANCO.md");
+            } else {
+                let is_empty = std::fs::read_dir(&root)?.next().is_none();
+                if !is_empty {
+                    anyhow::bail!("directory is not empty");
+                }
+                std::fs::create_dir_all(&banco_dir)?;
+                config::save(&root, &config::ProjectConfig {
+                    providers: vec![config::ProviderEntry {
+                        name: "local".to_string(),
+                        alias: None,
+                        enabled: true,
+                        config: std::collections::HashMap::new(),
+                    }],
+                })?;
+                local.init(&root)?;
+                std::fs::create_dir_all(root.join("misc"))?;
+                write_agent_files(&root, &local)?;
+                println!("Initialized banco in {}", root.display());
             }
-            std::fs::create_dir_all(&banco_dir)?;
-            config::save(&root, &config::ProjectConfig {
-                providers: vec![config::ProviderEntry {
-                    name: "local".to_string(),
-                    alias: None,
-                    enabled: true,
-                    config: std::collections::HashMap::new(),
-                }],
-            })?;
-            local.init(&root)?;
-            std::fs::create_dir_all(root.join("misc"))?;
-            write_agent_files(&root, &local)?;
-            println!("Initialized banco in {}", root.display());
         }
         Commands::New { module, name, labels } => {
             let m = local
