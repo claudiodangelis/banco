@@ -18,6 +18,30 @@ Set interactively via `banco provider add`.
 
 † Exactly one of `projects` or `projects_pattern` must be set; they are mutually exclusive.
 
+### Example configuration
+
+```yaml
+providers:
+  - name: github
+    config:
+      api_key: $GITHUB_TOKEN
+      projects:
+        - myorg/my-project
+        - myorg/another-project
+```
+
+With a pattern and GitHub Enterprise:
+
+```yaml
+providers:
+  - name: github
+    alias: github-work
+    config:
+      api_key: $GITHUB_WORK_TOKEN
+      host: https://github.mycompany.com
+      projects_pattern: myorg/.*
+```
+
 ## Directory structure
 
 Tasks are synced flat under `tasks/<provider>/<owner>/<repo>/`:

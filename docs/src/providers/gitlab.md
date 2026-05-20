@@ -17,6 +17,30 @@ Set interactively via `banco provider add`.
 
 † Exactly one of `projects` or `projects_pattern` must be set; they are mutually exclusive.
 
+### Example configuration
+
+```yaml
+providers:
+  - name: gitlab
+    config:
+      api_key: $GITLAB_TOKEN
+      projects:
+        - mygroup/my-project
+        - mygroup/another-project
+```
+
+With a pattern and a self-hosted instance:
+
+```yaml
+providers:
+  - name: gitlab
+    alias: gitlab-work
+    config:
+      api_key: $GITLAB_WORK_TOKEN
+      host: https://gitlab.mycompany.com
+      projects_pattern: mygroup/.*
+```
+
 ## Directory structure
 
 Tasks are synced flat under `tasks/<provider>/<project>/`:
