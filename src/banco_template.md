@@ -1,8 +1,7 @@
 # Banco Project
 
-This is a **Banco** project. Banco is an open-source project management tool
-for the command line that organizes notes, tasks, bookmarks, and repositories
-as plain files on the filesystem.
+Banco is an open-source CLI project management tool that organizes notes, tasks,
+bookmarks, and repositories as plain files on the filesystem.
 
 Banco source and documentation: https://github.com/claudiodangelis/banco
 
@@ -10,20 +9,57 @@ Banco source and documentation: https://github.com/claudiodangelis/banco
 
 ## Providers
 
-A **provider** is a source of items. Each provider contributes one or more
-modules (tasks, notes, bookmarks, repos) and is responsible for storing and
-syncing the data it owns.
+Providers are configured in `.banco/config.yml`. String values may reference
+environment variables using `$VAR` or `${VAR}` — banco expands them at runtime.
+Add a provider interactively with `banco provider add`, or edit the config file
+directly. Add an `alias` field when configuring multiple providers of the same kind.
 
-The **local** provider is the default provider. It is always present and
-enabled — no configuration or network access required. It manages items stored
-entirely on the local filesystem: notes, tasks, bookmarks, and repositories.
+### GitHub
 
-Additional providers (GitHub, GitLab) can be added via `banco provider add`
-and sync remote data (issues, repos) into the local filesystem when
-`banco sync` is run.
+```yaml
+providers:
+  - name: github
+    # alias: github-work        # optional; required when adding a second github provider
+    config:
+      api_key: $GITHUB_TOKEN    # required
+      # host: https://github.mycompany.com  # optional; for GitHub Enterprise
+      projects:                 # required — or use projects_pattern (mutually exclusive)
+        - myorg/my-project
+      # projects_pattern: myorg/.*
+      # sync_issues: false      # optional; default true
+```
 
-The active providers and their modules are listed in the `providers` field of
-`banco context`.
+### GitLab
+
+```yaml
+providers:
+  - name: gitlab
+    # alias: gitlab-work
+    config:
+      api_key: $GITLAB_TOKEN    # required
+      # host: https://gitlab.mycompany.com  # optional; for self-hosted instances
+      projects:                 # required — or use projects_pattern (mutually exclusive)
+        - mygroup/my-project
+      # projects_pattern: mygroup/.*
+      # sync_issues: false      # optional; default true
+```
+
+### JIRA
+
+Delegates to the `claude` CLI via the Atlassian Rovo MCP server — no API token
+required in banco. The `claude` CLI must be installed and authenticated.
+
+```yaml
+providers:
+  - name: jira
+    # alias: jira-sre
+    config:
+      host: https://yourorg.atlassian.net  # required
+      project: ENG                         # required; project key
+      agent_backend: claude                # required; only supported value
+      # labels:                            # optional; filter issues by label
+      #   - SRE
+```
 
 ---
 
@@ -112,29 +148,19 @@ banco context --pretty  # pretty-printed for human reading
 ### `banco new <module>`
 
 Creates a new item in the given module. Use `-n` for the name and
-`-l key=value` for each label. The list of available modules and their
-accepted labels is in the `labels` field of `banco context`.
+`-l key=value` for each label. Derive available modules and label values from
+`banco context`.
 
 ```sh
-# Create a note
 banco new note -n "My note" -l "label=meetings"
-
-# Create a task
 banco new task -n "Fix login bug" -l "status=backlog"
-
-# Create a bookmark
-banco new bookmark -n "Rust book" -l "label=tools/rust" -l "url=https://doc.rust-lang.org/book/"
-
-# Create a local repository (initialized as a git repo)
-banco new repo -n "my-project"
 ```
 
 **Do not invent label names or values.** Only use what the context reports.
 
 ### `banco sync [provider]`
 
-Pulls data from configured remote providers (GitHub, GitLab) and writes tasks
-and repos to the filesystem. Run without arguments to sync all providers.
+Pulls data from configured remote providers and writes it to the filesystem.
 
 ```sh
 banco sync           # sync all providers
