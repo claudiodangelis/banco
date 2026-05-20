@@ -12,3 +12,16 @@ Banco creates:
 ```sh
 banco init
 ```
+
+## Flags
+
+### `--update`
+
+Overwrites `.banco/BANCO.md` in an existing project with the version built into
+the installed binary. All other project files are left untouched.
+
+Useful after upgrading banco to pick up improvements to the agent instructions.
+
+```sh
+banco init --update
+```
