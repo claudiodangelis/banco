@@ -18,18 +18,20 @@ cargo install --path .
 
 Items (notes, tasks, bookmarks, repos) are grouped into **modules** and backed by **providers**.
 The built-in `local` provider stores everything on disk with no external dependencies. Remote
-providers (GitHub, GitLab) sync issues as tasks and clone repositories via SSH.
+providers (GitHub, GitLab) sync issues as tasks and clone repositories via SSH. The JIRA provider
+fetches issues via the `claude` CLI and the Atlassian Rovo MCP server — no API token required.
 
 Provider configuration lives in `.banco/config.yml`. String values support `$ENV_VAR` expansion
 so tokens are never stored in plain text.
 
 ## Providers
 
-| Provider | Modules             | Notes                                      |
-| -------- | ------------------- | ------------------------------------------ |
-| `local`  | tasks, notes, bookmarks, repos | Built in, no configuration needed |
-| `github` | tasks, repos        | Syncs issues and repositories via API + SSH |
-| `gitlab` | tasks, repos        | Syncs issues and repositories via API + SSH |
+| Provider | Modules             | Notes                                                        |
+| -------- | ------------------- | ------------------------------------------------------------ |
+| `local`  | tasks, notes, bookmarks, repos | Built in, no configuration needed               |
+| `github` | tasks, repos        | Syncs issues and repositories via API + SSH                  |
+| `gitlab` | tasks, repos        | Syncs issues and repositories via API + SSH                  |
+| `jira`   | tasks               | Fetches issues via `claude` CLI + Atlassian Rovo MCP server  |
 
 ## Documentation
 

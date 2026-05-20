@@ -35,3 +35,4 @@ name.
 - [Local](../providers/local.md)
 - [GitHub](../providers/github.md)
 - [GitLab](../providers/gitlab.md)
+- [JIRA](../providers/jira.md)

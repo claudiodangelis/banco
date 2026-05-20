@@ -48,3 +48,15 @@ Description here...
 
 `status` is `open` or `closed`. `tags` mirrors the issue's labels on GitLab. Both fields are
 updated automatically on each `banco sync` without touching the rest of the file.
+
+## Templates
+
+New task files are initialized from the first matching template found under `.banco/templates/tasks/`:
+`gitlab/<project>/TEMPLATE.md` → `gitlab/TEMPLATE.md` → `tasks/TEMPLATE.md`.
+See [Templates](../templates.md) for details.
+
+## Incremental sync
+
+After a successful sync, banco stores the timestamp in `.banco/sync-state/<provider>` and passes
+it as the `updated_after` parameter on subsequent API calls. Only issues updated after that point
+are fetched. See [`banco sync`](../commands/sync.md) for details.
