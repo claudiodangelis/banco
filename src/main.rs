@@ -22,7 +22,7 @@ use cli::{Cli, Commands, ProviderAction};
 use dialoguer::FuzzySelect;
 use module::BrowseItem;
 use context::{ContextOutput, ProviderContext};
-use provider::Provider;
+use provider::{Provider, SyncOpts};
 use providers::local::LocalProvider;
 use providers::github::GitHubProvider;
 use providers::gitlab::GitLabProvider;
@@ -306,7 +306,7 @@ fn run() -> anyhow::Result<()> {
             };
             println!("{}", json);
         }
-        Commands::Sync { provider } => {
+        Commands::Sync { provider, module, pattern } => {
             let providers = remote_providers(&root)?;
             if providers.is_empty() {
                 anyhow::bail!("no providers configured; run `banco provider add` first");
@@ -318,10 +318,16 @@ fn run() -> anyhow::Result<()> {
             if to_sync.is_empty() {
                 anyhow::bail!("no provider named '{}'", provider.unwrap());
             }
+            if let Some(ref m) = module {
+                if m != "tasks" && m != "repos" {
+                    anyhow::bail!("--module must be 'tasks' or 'repos'");
+                }
+            }
+            let opts = SyncOpts { module, pattern };
             sync_state::ensure_dir(&root)?;
             for p in to_sync {
                 println!("Syncing {}...", p.name());
-                p.sync(&root)?;
+                p.sync(&root, &opts)?;
             }
         }
         Commands::Completions { shell } => {

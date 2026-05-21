@@ -12,7 +12,7 @@ use regex::Regex;
 use crate::config::ProviderEntry;
 use crate::context::{Label, ModuleContext};
 use crate::module::{BrowseItem, Module};
-use crate::provider::{ConfigParam, ConfigParamKind, Provider};
+use crate::provider::{ConfigParam, ConfigParamKind, Provider, SyncOpts};
 use crate::sync_state;
 use crate::template::find_template;
 
@@ -208,16 +208,25 @@ impl Provider for GitHubProvider {
         Ok(())
     }
 
-    fn sync(&self, root: &Path) -> anyhow::Result<()> {
+    fn sync(&self, root: &Path, opts: &SyncOpts) -> anyhow::Result<()> {
         let client = self.client();
-        let projects = self.resolved_projects(&client)?;
+        let mut projects = self.resolved_projects(&client)?;
+
+        if let Some(ref pat) = opts.pattern {
+            let re = Regex::new(&format!("^(?:{})$", pat))
+                .map_err(|e| anyhow::anyhow!("invalid --pattern: {}", e))?;
+            projects.retain(|p| re.is_match(p));
+        }
+
+        let sync_tasks = opts.module.as_deref().map_or(true, |m| m == "tasks");
+        let sync_repos = opts.module.as_deref().map_or(true, |m| m == "repos");
 
         let sync_issues = self.entry.get_bool("sync_issues", true);
         let template_base = "tasks";
         let since = sync_state::read(root, self.entry.display_name());
         let synced_at = sync_state::now();
 
-        if sync_issues {
+        if sync_tasks && sync_issues {
             for owner_repo in &projects {
                 let owner = owner_repo.split('/').next().unwrap_or(owner_repo);
                 let repo_name = owner_repo.rsplit('/').next().unwrap_or(owner_repo);
@@ -244,7 +253,7 @@ impl Provider for GitHubProvider {
             }
         }
 
-        if !projects.is_empty() {
+        if sync_repos && !projects.is_empty() {
             self.github_repos(root).sync(&client, &projects)?;
         }
 
