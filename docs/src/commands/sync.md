@@ -3,11 +3,23 @@
 Pulls data from configured remote providers and writes it to the local filesystem.
 
 ```sh
-banco sync              # sync all configured providers
-banco sync <name>       # sync a specific provider by name or alias
+banco sync                                     # sync all configured providers
+banco sync <name>                              # sync a specific provider by name or alias
+banco sync <name> --module tasks               # sync only the tasks module
+banco sync <name> --module repos               # sync only the repos module
+banco sync <name> --pattern "myorg/frontend"   # sync only projects matching regex
 ```
 
+`--module` and `--pattern` can be combined: `banco sync github --module tasks --pattern "myorg/.*"`.
+
 Sync is non-destructive: it never deletes or overwrites existing files.
+
+## Options
+
+| Option | Description |
+| --- | --- |
+| `--module <tasks\|repos>` | Limit sync to a single module; skips the other. Useful when you only want to fetch issues without cloning repos, or vice versa. |
+| `--pattern <regex>` | Only sync projects whose path (`owner/repo` for GitHub/GitLab) matches this regex. Applied on top of the project list already defined in the provider config. Not applicable to Jira. |
 
 ## Incremental sync
 

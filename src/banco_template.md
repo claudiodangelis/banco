@@ -163,9 +163,14 @@ banco new task -n "Fix login bug" -l "status=backlog"
 Pulls data from configured remote providers and writes it to the filesystem.
 
 ```sh
-banco sync           # sync all providers
-banco sync github    # sync a specific provider by name or alias
+banco sync                                    # sync all providers
+banco sync github                             # sync a specific provider by name or alias
+banco sync github --module tasks              # sync only the tasks module
+banco sync github --module repos              # sync only the repos module
+banco sync github --pattern "myorg/frontend"  # sync only projects matching regex
 ```
+
+Use `--module` and `--pattern` together to narrow a sync to exactly the data you need.
 
 ---
 

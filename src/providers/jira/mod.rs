@@ -11,7 +11,7 @@ use walkdir::WalkDir;
 use crate::config::ProviderEntry;
 use crate::context::{Label, ModuleContext};
 use crate::module::BrowseItem;
-use crate::provider::{ConfigParam, ConfigParamKind, Provider};
+use crate::provider::{ConfigParam, ConfigParamKind, Provider, SyncOpts};
 use crate::sync_state;
 use crate::template::find_template;
 
@@ -86,7 +86,12 @@ impl Provider for JiraProvider {
         Ok(())
     }
 
-    fn sync(&self, root: &Path) -> anyhow::Result<()> {
+    fn sync(&self, root: &Path, opts: &SyncOpts) -> anyhow::Result<()> {
+        if opts.module.as_deref() == Some("repos") {
+            println!("  skipping: jira provider has no repos module");
+            return Ok(());
+        }
+
         let project = self.entry.get_str("project")
             .ok_or_else(|| anyhow::anyhow!("`project` is required in the jira provider config"))?;
         let labels = self.entry.get_list("labels");

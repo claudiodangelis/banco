@@ -16,12 +16,17 @@ pub enum ConfigParamKind {
     Bool,
 }
 
+pub struct SyncOpts {
+    pub module: Option<String>,
+    pub pattern: Option<String>,
+}
+
 pub trait Provider {
     fn name(&self) -> &str;
     fn init(&self, root: &Path) -> anyhow::Result<()>;
     fn context(&self, root: &Path) -> anyhow::Result<Vec<ModuleContext>>;
 
-    fn sync(&self, _root: &Path) -> anyhow::Result<()> {
+    fn sync(&self, _root: &Path, _opts: &SyncOpts) -> anyhow::Result<()> {
         Ok(())
     }
 

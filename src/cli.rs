@@ -45,6 +45,12 @@ pub enum Commands {
     Sync {
         /// Provider name or alias to sync (syncs all if omitted)
         provider: Option<String>,
+        /// Limit sync to a specific module: tasks or repos
+        #[arg(long)]
+        module: Option<String>,
+        /// Only sync projects whose path matches this regex
+        #[arg(long)]
+        pattern: Option<String>,
     },
     /// Generate shell completion scripts
     Completions {
