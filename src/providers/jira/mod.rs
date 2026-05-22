@@ -150,6 +150,22 @@ impl Provider for JiraProvider {
             }
         }
 
+        // Reconcile: local non-done tasks absent from the fetched set were completed on remote.
+        let fetched_ids: std::collections::HashSet<&str> =
+            issues.iter().map(|i| i.id.as_str()).collect();
+        for (id, path) in &existing {
+            if fetched_ids.contains(id.as_str()) {
+                continue;
+            }
+            let content = std::fs::read_to_string(path)?;
+            let (fm, _) = frontmatter::parse(&content);
+            if let Some(fm) = fm {
+                if fm.status != "Done" {
+                    frontmatter::apply(path, "Done", &fm.issue_type, fm.parent_id.as_deref())?;
+                }
+            }
+        }
+
         sync_state::write(root, self.entry.display_name(), &synced_at)?;
         println!("  synced {} issues for project {}", issues.len(), project);
         Ok(())
