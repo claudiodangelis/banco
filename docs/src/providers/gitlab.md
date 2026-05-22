@@ -82,5 +82,11 @@ See [Templates](../templates.md) for details.
 ## Incremental sync
 
 After a successful sync, banco stores the timestamp in `.banco/sync-state/<provider>` and passes
-it as the `updated_after` parameter on subsequent API calls. Only issues updated after that point
-are fetched. See [`banco sync`](../commands/sync.md) for details.
+it as the `updated_after` parameter on subsequent API calls. Only open issues updated after that
+point are fetched.
+
+After writing the fetched issues, banco reconciles local tasks: any local task with `status: open`
+whose issue IID was not in the fetched set is marked `closed` — it was closed on GitLab and
+disappeared from the open results. Tasks already `closed` locally are left untouched.
+
+See [`banco sync`](../commands/sync.md) for the full sync flow.

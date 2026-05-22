@@ -32,12 +32,38 @@ file is only written on success, so a failed sync will retry the full window on 
 
 ## Tasks (issues)
 
-| Situation                | Action                                                  |
-| ------------------------ | ------------------------------------------------------- |
-| Issue not yet on disk    | Creates a new file with frontmatter and initial content |
-| Issue title changed      | Renames the file; body content is untouched             |
-| Status or labels changed | Updates frontmatter block; body content is untouched    |
-| Issue unchanged          | Does nothing                                            |
+Syncing tasks is a two-phase process: **fetch** then **reconcile**.
+
+```mermaid
+flowchart TD
+    A([Start]) --> B[Read since timestamp]
+    B --> C[Fetch open issues from remote]
+    C --> D[For each fetched issue:\ncreate / rename / update local file]
+    D --> E[Build set of fetched IDs]
+    E --> F[Scan all local task files]
+    F --> G{ID in\nfetched set?}
+    G -- yes --> H([No action])
+    G -- no --> I{Local status\nalready done/closed?}
+    I -- yes --> H
+    I -- no --> J[Mark as done/closed]
+    J --> K([Write sync timestamp])
+    H --> K
+```
+
+**Phase 1 — fetch.** Only open/non-done issues are pulled from the remote. The `since` timestamp
+limits the fetch to issues updated since the last sync (first sync fetches everything).
+
+**Phase 2 — reconcile.** After writing the fetched issues, banco scans every local task file. Any
+task whose ID was *not* in the fetched set and whose local status is not already done/closed is
+marked done/closed — it was completed on the remote and simply disappeared from the open results.
+
+| Situation                              | Action                                                  |
+| -------------------------------------- | ------------------------------------------------------- |
+| Issue not yet on disk                  | Creates a new file with frontmatter and initial content |
+| Issue title changed                    | Renames the file; body content is untouched             |
+| Status or labels changed               | Updates frontmatter block; body content is untouched    |
+| Issue unchanged                        | Does nothing                                            |
+| Local open task absent from remote set | Marks the local file as done/closed                     |
 
 ## Repos
 

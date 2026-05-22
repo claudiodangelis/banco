@@ -102,8 +102,13 @@ See [Templates](../templates.md) for details.
 
 After a successful sync, banco stores the timestamp in `.banco/sync-state/<provider>` and
 includes it in the prompt sent to the agent backend, asking for only issues updated since that
-point. The first sync always fetches everything. See [`banco sync`](../commands/sync.md) for
-details.
+point. The first sync always fetches everything.
+
+After writing the fetched issues, banco reconciles local tasks: any local task whose status is not
+`Done` and whose ID was not in the fetched set is marked `Done` — it was completed on JIRA and
+disappeared from the non-done results. Tasks already `Done` locally are left untouched.
+
+See [`banco sync`](../commands/sync.md) for the full sync flow.
 
 ## Syncing
 
