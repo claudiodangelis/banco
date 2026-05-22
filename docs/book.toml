@@ -5,9 +5,3 @@ language = "en"
 
 [output.html]
 site-url = "/banco/"
-additional-js = ["mermaid.min.js", "mermaid-init.js"]
-
-[preprocessor]
-
-[preprocessor.mermaid]
-command = "mdbook-mermaid"
