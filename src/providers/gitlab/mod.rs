@@ -228,11 +228,24 @@ impl Provider for GitLabProvider {
                 let tpl = find_template(root, template_base, &format!("{}/{}", self.entry.display_name(), project.path));
 
                 let mut existing = scan_col(&task_dir);
+                let mut fetched_numbers: std::collections::HashSet<u64> = std::collections::HashSet::new();
                 for issue in client.issues_open(project.id, since.as_deref())? {
+                    fetched_numbers.insert(issue.iid);
                     apply_issue(&issue, "open", &task_dir, &mut existing, tpl.as_deref())?;
                 }
-                for issue in client.issues_closed(project.id, since.as_deref())? {
-                    apply_issue(&issue, "closed", &task_dir, &mut existing, tpl.as_deref())?;
+
+                // Reconcile: local non-closed tasks absent from the open set were closed on remote.
+                for (iid, path) in &existing {
+                    if fetched_numbers.contains(iid) {
+                        continue;
+                    }
+                    let content = std::fs::read_to_string(path)?;
+                    let (fm, _) = frontmatter::parse(&content);
+                    if let Some(fm) = fm {
+                        if fm.status != "closed" {
+                            frontmatter::apply(path, "closed", &fm.tags)?;
+                        }
+                    }
                 }
 
                 println!("  synced issues for {}", namespace_project);

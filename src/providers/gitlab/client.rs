@@ -88,10 +88,6 @@ impl GitLabClient {
         self.issues(project_id, "opened", since)
     }
 
-    pub fn issues_closed(&self, project_id: u64, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
-        self.issues(project_id, "closed", since)
-    }
-
     fn issues(&self, project_id: u64, state: &str, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
         let path = format!("/projects/{}/issues", project_id);
         match since {
