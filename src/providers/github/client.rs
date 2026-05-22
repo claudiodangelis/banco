@@ -98,10 +98,6 @@ impl GitHubClient {
         self.issues(owner_repo, "open", since)
     }
 
-    pub fn issues_closed(&self, owner_repo: &str, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
-        self.issues(owner_repo, "closed", since)
-    }
-
     fn issues(&self, owner_repo: &str, state: &str, since: Option<&str>) -> anyhow::Result<Vec<Issue>> {
         let path = format!("/repos/{}/issues", owner_repo);
         match since {
