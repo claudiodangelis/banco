@@ -236,17 +236,27 @@ impl Provider for GitHubProvider {
                 let tpl = find_template(root, template_base, &format!("{}/{}/{}", self.entry.display_name(), owner, repo_name));
 
                 let mut existing = scan_col(&task_dir);
+                let mut fetched_numbers: std::collections::HashSet<u64> = std::collections::HashSet::new();
                 for issue in client.issues_open(owner_repo, since.as_deref())? {
                     if issue.pull_request.is_some() {
                         continue;
                     }
+                    fetched_numbers.insert(issue.number);
                     apply_issue(&issue, "open", &task_dir, &mut existing, tpl.as_deref())?;
                 }
-                for issue in client.issues_closed(owner_repo, since.as_deref())? {
-                    if issue.pull_request.is_some() {
+
+                // Reconcile: local non-closed tasks absent from the open set were closed on remote.
+                for (number, path) in &existing {
+                    if fetched_numbers.contains(number) {
                         continue;
                     }
-                    apply_issue(&issue, "closed", &task_dir, &mut existing, tpl.as_deref())?;
+                    let content = std::fs::read_to_string(path)?;
+                    let (fm, _) = frontmatter::parse(&content);
+                    if let Some(fm) = fm {
+                        if fm.status != "closed" {
+                            frontmatter::apply(path, "closed", &fm.tags)?;
+                        }
+                    }
                 }
 
                 println!("  synced issues for {}", owner_repo);
