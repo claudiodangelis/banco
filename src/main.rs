@@ -59,23 +59,23 @@ fn open_browser(url: &str, browse: Option<&config::BrowseConfig>) -> anyhow::Res
         std::process::Command::new(&cfg.command)
             .args(&cfg.args)
             .arg(url)
-            .status()
+            .spawn()
             .with_context(|| format!("failed to launch browser '{}'", cfg.command))?;
         return Ok(());
     }
     if let Ok(browser) = std::env::var("BROWSER") {
         std::process::Command::new(&browser)
             .arg(url)
-            .status()
+            .spawn()
             .with_context(|| format!("failed to launch browser '{}'", browser))?;
         return Ok(());
     }
     #[cfg(target_os = "linux")]
-    std::process::Command::new("xdg-open").arg(url).status().context("failed to open browser")?;
+    std::process::Command::new("xdg-open").arg(url).spawn().context("failed to open browser")?;
     #[cfg(target_os = "macos")]
-    std::process::Command::new("open").arg(url).status().context("failed to open browser")?;
+    std::process::Command::new("open").arg(url).spawn().context("failed to open browser")?;
     #[cfg(target_os = "windows")]
-    std::process::Command::new("cmd").args(["/c", "start", url]).status().context("failed to open browser")?;
+    std::process::Command::new("cmd").args(["/c", "start", url]).spawn().context("failed to open browser")?;
     Ok(())
 }
 
