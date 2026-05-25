@@ -55,6 +55,9 @@ Subdirectories act as labels/tags and can be nested.\
     }
 
     fn create(&self, root: &Path, name: &str, params: &HashMap<String, String>) -> anyhow::Result<PathBuf> {
+        if sanitize_filename::sanitize(name) != name {
+            anyhow::bail!("bookmark name contains characters not valid in a filename: '{}'", name);
+        }
         let label = params.get("label").map(|s| s.as_str()).unwrap_or("");
         let url = params.get("url").map(|s| s.as_str()).unwrap_or("");
         let dir = if label.is_empty() {
