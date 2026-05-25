@@ -37,3 +37,4 @@
 # Reference
 
 - [Templates](templates.md)
+- [misc](misc.md)
