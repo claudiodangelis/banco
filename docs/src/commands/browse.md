@@ -7,8 +7,37 @@ banco browse
 ```
 
 Presents a fuzzy-select menu: provider → module → item → page (if the item has more than one
-page). The selected URL is opened via `$BROWSER`, `xdg-open`, `open`, or `cmd /c start`, tried
-in that order.
+page). The selected URL is opened with the configured browser, the `$BROWSER` environment
+variable, `xdg-open`, `open`, or `cmd /c start`, tried in that order.
+
+## Configuring the browser
+
+By default, `banco browse` delegates to the `$BROWSER` environment variable or the OS default
+opener. You can override this in `.banco/config.yml`.
+
+### Global (all providers)
+
+```yaml
+browse:
+  command: firefox
+  args: ['-P', 'my-profile']
+```
+
+### Per-provider
+
+```yaml
+providers:
+  - name: gitlab
+    enabled: true
+    browse:
+      command: chromium
+      args: ['--profile-directory=Work']
+```
+
+The per-provider setting takes precedence over the global one. Both take precedence over
+`$BROWSER` and the OS default.
+
+`args` is optional and defaults to an empty list. The URL is always appended as the last argument.
 
 ## Browseable items
 

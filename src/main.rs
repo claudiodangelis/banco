@@ -54,7 +54,15 @@ fn write_agent_files(root: &Path, local: &LocalProvider) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn open_browser(url: &str) -> anyhow::Result<()> {
+fn open_browser(url: &str, browse: Option<&config::BrowseConfig>) -> anyhow::Result<()> {
+    if let Some(cfg) = browse {
+        std::process::Command::new(&cfg.command)
+            .args(&cfg.args)
+            .arg(url)
+            .status()
+            .with_context(|| format!("failed to launch browser '{}'", cfg.command))?;
+        return Ok(());
+    }
     if let Ok(browser) = std::env::var("BROWSER") {
         std::process::Command::new(&browser)
             .arg(url)
@@ -163,6 +171,7 @@ fn provider_add(root: &Path) -> anyhow::Result<()> {
         alias,
         enabled: true,
         config: cfg_map,
+        browse: None,
     };
 
     let mut project_config = project_config;
@@ -228,7 +237,9 @@ fn run() -> anyhow::Result<()> {
                         alias: None,
                         enabled: true,
                         config: std::collections::HashMap::new(),
+                        browse: None,
                     }],
+                    browse: None,
                 })?;
                 local.init(&root)?;
                 std::fs::create_dir_all(root.join("misc"))?;
@@ -337,6 +348,11 @@ fn run() -> anyhow::Result<()> {
         }
         Commands::Browse => {
             let theme = ColorfulTheme::default();
+            let project_config = config::load(&root)?;
+
+            let provider_browse: HashMap<String, config::BrowseConfig> = project_config.providers.iter()
+                .filter_map(|e| e.browse.clone().map(|b| (e.display_name().to_string(), b)))
+                .collect();
 
             let mut all: Vec<(String, Vec<(String, Vec<BrowseItem>)>)> = Vec::new();
 
@@ -402,7 +418,10 @@ fn run() -> anyhow::Result<()> {
                 &item.pages[page_idx].1
             };
 
-            open_browser(url)?;
+            let selected_provider = &all[provider_idx].0;
+            let browse_config = provider_browse.get(selected_provider)
+                .or(project_config.browse.as_ref());
+            open_browser(url, browse_config)?;
         }
         Commands::Provider { action } => match action {
             ProviderAction::Add => {

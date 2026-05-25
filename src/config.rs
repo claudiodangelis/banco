@@ -4,10 +4,19 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
+#[derive(Deserialize, Serialize, Clone)]
+pub struct BrowseConfig {
+    pub command: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+}
+
 #[derive(Deserialize, Serialize, Default)]
 pub struct ProjectConfig {
     #[serde(default)]
     pub providers: Vec<ProviderEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browse: Option<BrowseConfig>,
 }
 
 fn default_true() -> bool {
@@ -23,6 +32,8 @@ pub struct ProviderEntry {
     pub enabled: bool,
     #[serde(default)]
     pub config: HashMap<String, serde_yaml::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browse: Option<BrowseConfig>,
 }
 
 fn expand_env(s: &str) -> String {
