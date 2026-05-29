@@ -1,22 +1,6 @@
-use std::path::{Path, PathBuf};
-
-use walkdir::WalkDir;
+use std::path::Path;
 
 pub use crate::template::find_template;
-
-pub fn non_md_files(base: &Path) -> anyhow::Result<Vec<PathBuf>> {
-    if !base.exists() {
-        return Ok(vec![]);
-    }
-    let extra = WalkDir::new(base)
-        .min_depth(1)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .map(|e| e.into_path())
-        .filter(|p| p.is_file() && p.extension().map_or(true, |e| e != "md"))
-        .collect();
-    Ok(extra)
-}
 
 pub fn label_template_paths(base: &str, root: &Path) -> Vec<String> {
     let mut paths = vec![base.to_string()];

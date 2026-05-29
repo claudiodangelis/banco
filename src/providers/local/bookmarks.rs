@@ -6,7 +6,7 @@ use walkdir::WalkDir;
 
 use crate::context::Label;
 use crate::module::{BrowseItem, Module};
-use super::util::{find_template, label_template_paths, non_md_files};
+use super::util::{find_template, label_template_paths};
 
 pub struct Bookmarks;
 
@@ -136,9 +136,5 @@ Subdirectories act as labels/tags and can be nested.\
 
     fn root_dirs(&self) -> Vec<&str> {
         vec!["bookmarks"]
-    }
-
-    fn extraneous_paths(&self, root: &Path) -> anyhow::Result<Vec<PathBuf>> {
-        non_md_files(&root.join("bookmarks/local"))
     }
 }
