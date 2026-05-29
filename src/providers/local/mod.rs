@@ -40,6 +40,11 @@ impl LocalProvider {
     }
 
     pub fn check(&self, root: &Path) -> anyhow::Result<CheckFindings> {
+        let project_config = crate::config::load(root)?;
+        let valid_providers: HashSet<String> = std::iter::once("local".to_string())
+            .chain(project_config.providers.iter().map(|e| e.display_name().to_string()))
+            .collect();
+
         let owned: HashSet<&str> = self.modules.iter().flat_map(|m| m.root_dirs()).collect();
 
         let mut extraneous_dirs = Vec::new();
@@ -54,10 +59,27 @@ impl LocalProvider {
 
         let mut extraneous_module_paths = Vec::new();
         for module in &self.modules {
+            for module_root_name in module.root_dirs() {
+                let module_root = root.join(module_root_name);
+                if !module_root.exists() {
+                    continue;
+                }
+                for entry in std::fs::read_dir(&module_root)? {
+                    let path = entry?.path();
+                    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                    if path.is_file() || (path.is_dir() && !valid_providers.contains(name)) {
+                        extraneous_module_paths.push(path);
+                    }
+                }
+            }
+
             let mut paths = module.extraneous_paths(root)?;
             paths.sort();
             extraneous_module_paths.extend(paths);
         }
+
+        extraneous_module_paths.sort();
+        extraneous_module_paths.dedup();
 
         Ok(CheckFindings { extraneous_dirs, extraneous_module_paths })
     }

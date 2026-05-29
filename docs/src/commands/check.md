@@ -23,15 +23,25 @@ extraneous directory: archive/
 
 ### Extraneous paths within modules
 
-Each module defines the structure it expects under its directory. Anything on disk that falls
-outside those rules is flagged:
+Module directories follow the layout `{module}/{provider}/{item}`. The check enforces this at
+two levels.
 
-| Module      | Flagged as extraneous                                              |
-| ----------- | ------------------------------------------------------------------ |
-| `notes`     | Non-`.md` files anywhere under `notes/local/`                     |
-| `tasks`     | Files directly in `tasks/local/`; subdirectories other than `backlog/`, `doing/`, `done/`; non-`.md` files inside status subdirectories |
-| `bookmarks` | Non-`.md` files anywhere under `bookmarks/local/`                 |
-| `repos`     | Non-directory entries under `repos/local/`                        |
+**Provider subdirectory** — every direct subdirectory of a module root must match a configured
+provider name (or alias). `local` is always valid; any other provider you have added via
+`banco provider add` is also valid.
+
+```
+extraneous path: repos/banco/    ← "banco" is not a configured provider
+```
+
+**Provider contents** — inside each `{module}/local/` directory the expected structure is:
+
+| Module      | Flagged as extraneous                                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `notes`     | Non-`.md` files anywhere under `notes/local/`                                                                                              |
+| `tasks`     | Files directly in `tasks/local/`; subdirectories other than `backlog/`, `doing/`, `done/`; non-`.md` files inside status subdirectories    |
+| `bookmarks` | Non-`.md` files anywhere under `bookmarks/local/`                                                                                          |
+| `repos`     | Non-directory entries under `repos/local/`                                                                                                  |
 
 ```
 extraneous path: notes/local/scratch.txt
