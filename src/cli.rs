@@ -59,6 +59,8 @@ pub enum Commands {
     },
     /// Browse bookmarks with a fuzzy finder and open in the default browser
     Browse,
+    /// Check for extraneous content in the banco directory
+    Check,
 }
 
 #[derive(Subcommand)]

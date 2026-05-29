@@ -72,4 +72,23 @@ those may be a better fit for repositories hosted on a remote platform.\
         }
         Ok(items)
     }
+
+    fn root_dirs(&self) -> Vec<&str> {
+        vec!["repos"]
+    }
+
+    fn extraneous_paths(&self, root: &Path) -> anyhow::Result<Vec<PathBuf>> {
+        let base = root.join("repos/local");
+        if !base.exists() {
+            return Ok(vec![]);
+        }
+        let mut extra = Vec::new();
+        for entry in std::fs::read_dir(&base)? {
+            let path = entry?.path();
+            if !path.is_dir() {
+                extra.push(path);
+            }
+        }
+        Ok(extra)
+    }
 }

@@ -32,6 +32,7 @@
 - [provider](commands/provider.md)
 - [sync](commands/sync.md)
 - [browse](commands/browse.md)
+- [check](commands/check.md)
 - [completions](commands/completions.md)
 
 # Reference

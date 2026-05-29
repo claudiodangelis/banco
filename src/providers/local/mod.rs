@@ -4,11 +4,17 @@ mod repos;
 mod tasks;
 mod util;
 
-use std::path::Path;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 use crate::context::ModuleContext;
 use crate::module::{BrowseItem, Module};
 use crate::provider::Provider;
+
+pub struct CheckFindings {
+    pub extraneous_dirs: Vec<PathBuf>,
+    pub extraneous_module_paths: Vec<PathBuf>,
+}
 
 pub struct LocalProvider {
     modules: Vec<Box<dyn Module>>,
@@ -31,6 +37,29 @@ impl LocalProvider {
 
     pub fn module_descriptions(&self) -> Vec<String> {
         self.modules.iter().map(|m| m.describe()).collect()
+    }
+
+    pub fn check(&self, root: &Path) -> anyhow::Result<CheckFindings> {
+        let owned: HashSet<&str> = self.modules.iter().flat_map(|m| m.root_dirs()).collect();
+
+        let mut extraneous_dirs = Vec::new();
+        for entry in std::fs::read_dir(root)? {
+            let path = entry?.path();
+            let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            if path.is_dir() && !name.starts_with('.') && name != "misc" && !owned.contains(name) {
+                extraneous_dirs.push(path);
+            }
+        }
+        extraneous_dirs.sort();
+
+        let mut extraneous_module_paths = Vec::new();
+        for module in &self.modules {
+            let mut paths = module.extraneous_paths(root)?;
+            paths.sort();
+            extraneous_module_paths.extend(paths);
+        }
+
+        Ok(CheckFindings { extraneous_dirs, extraneous_module_paths })
     }
 }
 

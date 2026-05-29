@@ -23,7 +23,7 @@ use dialoguer::FuzzySelect;
 use module::BrowseItem;
 use context::{ContextOutput, ProviderContext};
 use provider::{Provider, SyncOpts};
-use providers::local::LocalProvider;
+use providers::local::{CheckFindings, LocalProvider};
 use providers::github::GitHubProvider;
 use providers::gitlab::GitLabProvider;
 use providers::jira::JiraProvider;
@@ -79,6 +79,18 @@ fn open_browser(url: &str, browse: Option<&config::BrowseConfig>) -> anyhow::Res
     Ok(())
 }
 
+
+fn print_check_findings(root: &Path, findings: &CheckFindings) {
+    for path in &findings.extraneous_dirs {
+        let rel = path.strip_prefix(root).unwrap_or(path);
+        eprintln!("extraneous directory: {}/", rel.display());
+    }
+    for path in &findings.extraneous_module_paths {
+        let rel = path.strip_prefix(root).unwrap_or(path);
+        let suffix = if path.is_dir() { "/" } else { "" };
+        eprintln!("extraneous path: {}{}", rel.display(), suffix);
+    }
+}
 
 const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab", "jira"];
 
@@ -431,6 +443,16 @@ fn run() -> anyhow::Result<()> {
                 provider_list(&root)?;
             }
         },
+        Commands::Check => {
+            let findings = local.check(&root)?;
+            let clean = findings.extraneous_dirs.is_empty() && findings.extraneous_module_paths.is_empty();
+            if clean {
+                println!("No issues found.");
+            } else {
+                print_check_findings(&root, &findings);
+                std::process::exit(1);
+            }
+        }
     }
 
     Ok(())

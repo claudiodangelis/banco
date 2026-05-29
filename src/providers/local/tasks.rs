@@ -105,4 +105,35 @@ Tasks are stored here as markdown files, organized by status:
         }
         Ok(items)
     }
+
+    fn root_dirs(&self) -> Vec<&str> {
+        vec!["tasks"]
+    }
+
+    fn extraneous_paths(&self, root: &Path) -> anyhow::Result<Vec<PathBuf>> {
+        let base = root.join("tasks/local");
+        if !base.exists() {
+            return Ok(vec![]);
+        }
+        let mut extra = Vec::new();
+        for entry in std::fs::read_dir(&base)? {
+            let path = entry?.path();
+            let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            if path.is_dir() {
+                if !STATUSES.contains(&name) {
+                    extra.push(path);
+                } else {
+                    for sub in std::fs::read_dir(&path)? {
+                        let sub_path = sub?.path();
+                        if sub_path.is_file() && sub_path.extension().map_or(true, |e| e != "md") {
+                            extra.push(sub_path);
+                        }
+                    }
+                }
+            } else if path.is_file() {
+                extra.push(path);
+            }
+        }
+        Ok(extra)
+    }
 }

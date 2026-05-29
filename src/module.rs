@@ -27,4 +27,12 @@ pub trait Module {
     fn browse_items(&self, _root: &Path) -> anyhow::Result<Vec<BrowseItem>> {
         Ok(vec![])
     }
+
+    fn root_dirs(&self) -> Vec<&str> {
+        vec![]
+    }
+
+    fn extraneous_paths(&self, _root: &Path) -> anyhow::Result<Vec<PathBuf>> {
+        Ok(vec![])
+    }
 }
