@@ -92,6 +92,43 @@ fn print_check_findings(root: &Path, findings: &CheckFindings) {
     }
 }
 
+fn check_config(root: &Path) -> anyhow::Result<Vec<String>> {
+    let project_config = config::load(root)?;
+    let mut issues = Vec::new();
+
+    for entry in &project_config.providers {
+        let schema = match entry.name.as_str() {
+            "github" => GitHubProvider::available_config_schema(),
+            "gitlab" => GitLabProvider::available_config_schema(),
+            "jira"   => JiraProvider::available_config_schema(),
+            _        => continue,
+        };
+
+        let label = match &entry.alias {
+            Some(alias) => format!("provider '{}' (alias '{}')", entry.name, alias),
+            None        => format!("provider '{}'", entry.name),
+        };
+
+        let known: std::collections::HashSet<&str> = schema.iter().map(|p| p.name).collect();
+
+        let mut entry_issues = Vec::new();
+        for key in entry.config.keys() {
+            if !known.contains(key.as_str()) {
+                entry_issues.push(format!("{label}: unknown parameter '{key}'"));
+            }
+        }
+        for param in &schema {
+            if param.required && !entry.config.contains_key(param.name) {
+                entry_issues.push(format!("{label}: missing required parameter '{}'", param.name));
+            }
+        }
+        entry_issues.sort();
+        issues.extend(entry_issues);
+    }
+
+    Ok(issues)
+}
+
 const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab", "jira"];
 
 fn provider_add(root: &Path) -> anyhow::Result<()> {
@@ -445,11 +482,17 @@ fn run() -> anyhow::Result<()> {
         },
         Commands::Check => {
             let findings = local.check(&root)?;
-            let clean = findings.extraneous_dirs.is_empty() && findings.extraneous_module_paths.is_empty();
+            let config_issues = check_config(&root)?;
+            let clean = findings.extraneous_dirs.is_empty()
+                && findings.extraneous_module_paths.is_empty()
+                && config_issues.is_empty();
             if clean {
                 println!("No issues found.");
             } else {
                 print_check_findings(&root, &findings);
+                for issue in &config_issues {
+                    eprintln!("config: {issue}");
+                }
                 std::process::exit(1);
             }
         }

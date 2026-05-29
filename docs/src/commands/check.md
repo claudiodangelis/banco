@@ -50,6 +50,20 @@ extraneous path: tasks/local/doing/notes.csv
 extraneous path: repos/local/README.md
 ```
 
+### Provider configuration
+
+Every provider entry in `.banco/config.yml` is validated against its known schema:
+
+- **Unknown parameters** — keys in the `config:` block that are not recognised by the provider are flagged.
+- **Missing required parameters** — keys that the provider requires but are absent from the `config:` block are flagged.
+
+```
+config: provider 'github': unknown parameter 'token'
+config: provider 'jira' (alias 'work-jira'): missing required parameter 'agent_backend'
+```
+
+The `local` provider has no configuration schema and is not validated.
+
 ## Unmanaged content
 
 If you need to keep files that are intentionally outside any module, place them in `misc/` —
