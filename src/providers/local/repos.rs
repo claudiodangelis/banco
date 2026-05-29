@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use serde_json::{json, Value};
 
 use crate::context::Label;
-use crate::module::Module;
+use crate::module::{ItemKind, Module};
 
 pub struct Repos;
 
@@ -77,18 +77,7 @@ those may be a better fit for repositories hosted on a remote platform.\
         vec!["repos"]
     }
 
-    fn extraneous_paths(&self, root: &Path) -> anyhow::Result<Vec<PathBuf>> {
-        let base = root.join("repos/local");
-        if !base.exists() {
-            return Ok(vec![]);
-        }
-        let mut extra = Vec::new();
-        for entry in std::fs::read_dir(&base)? {
-            let path = entry?.path();
-            if !path.is_dir() {
-                extra.push(path);
-            }
-        }
-        Ok(extra)
+    fn item_kind(&self) -> ItemKind {
+        ItemKind::Directory
     }
 }

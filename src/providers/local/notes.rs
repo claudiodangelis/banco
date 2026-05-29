@@ -6,7 +6,7 @@ use walkdir::WalkDir;
 
 use crate::context::Label;
 use crate::module::Module;
-use super::util::{find_template, label_template_paths, non_md_files};
+use super::util::{find_template, label_template_paths};
 
 pub struct Notes;
 
@@ -85,9 +85,5 @@ Subdirectories act as labels/tags and can be nested.\
 
     fn root_dirs(&self) -> Vec<&str> {
         vec!["notes"]
-    }
-
-    fn extraneous_paths(&self, root: &Path) -> anyhow::Result<Vec<PathBuf>> {
-        non_md_files(&root.join("notes/local"))
     }
 }

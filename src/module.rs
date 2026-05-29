@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use walkdir::WalkDir;
+
 use crate::context::Label;
 
 pub struct BrowseItem {
@@ -12,6 +14,11 @@ impl BrowseItem {
     pub fn default_page(display: impl Into<String>, url: impl Into<String>) -> Self {
         Self { display: display.into(), pages: vec![("default".to_string(), url.into())] }
     }
+}
+
+pub enum ItemKind {
+    FileWithExtension(&'static str),
+    Directory,
 }
 
 pub trait Module {
@@ -32,7 +39,41 @@ pub trait Module {
         vec![]
     }
 
-    fn extraneous_paths(&self, _root: &Path) -> anyhow::Result<Vec<PathBuf>> {
-        Ok(vec![])
+    fn item_kind(&self) -> ItemKind {
+        ItemKind::FileWithExtension("md")
+    }
+
+    fn item_matches(&self, path: &Path) -> bool {
+        match self.item_kind() {
+            ItemKind::FileWithExtension(ext) => {
+                path.is_file() && path.extension().map_or(false, |e| e == ext)
+            }
+            ItemKind::Directory => path.is_dir(),
+        }
+    }
+
+    fn extraneous_paths(&self, root: &Path) -> anyhow::Result<Vec<PathBuf>> {
+        let dirs = self.root_dirs();
+        if dirs.is_empty() {
+            return Ok(vec![]);
+        }
+        let base = root.join(dirs[0]).join("local");
+        if !base.exists() {
+            return Ok(vec![]);
+        }
+        match self.item_kind() {
+            ItemKind::FileWithExtension(ext) => Ok(WalkDir::new(&base)
+                .min_depth(1)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .map(|e| e.into_path())
+                .filter(|p| p.is_file() && p.extension().map_or(true, |e| e != ext))
+                .collect()),
+            ItemKind::Directory => Ok(std::fs::read_dir(&base)?
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| !p.is_dir())
+                .collect()),
+        }
     }
 }

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use serde_json::{json, Value};
 
 use crate::context::Label;
-use crate::module::Module;
+use crate::module::{ItemKind, Module};
 use super::util::find_template;
 
 pub struct Tasks;
@@ -110,6 +110,10 @@ Tasks are stored here as markdown files, organized by status:
         vec!["tasks"]
     }
 
+    fn item_kind(&self) -> ItemKind {
+        ItemKind::FileWithExtension("md")
+    }
+
     fn extraneous_paths(&self, root: &Path) -> anyhow::Result<Vec<PathBuf>> {
         let base = root.join("tasks/local");
         if !base.exists() {
@@ -125,7 +129,7 @@ Tasks are stored here as markdown files, organized by status:
                 } else {
                     for sub in std::fs::read_dir(&path)? {
                         let sub_path = sub?.path();
-                        if sub_path.is_file() && sub_path.extension().map_or(true, |e| e != "md") {
+                        if !self.item_matches(&sub_path) {
                             extra.push(sub_path);
                         }
                     }
