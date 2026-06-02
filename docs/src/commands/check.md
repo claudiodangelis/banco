@@ -40,7 +40,7 @@ extraneous path: repos/banco/    ← "banco" is not a configured provider
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `notes`     | Non-`.md` files anywhere under `notes/local/`                                                                                              |
 | `tasks`     | Files directly in `tasks/local/`; subdirectories other than `backlog/`, `doing/`, `done/`; non-`.md` files inside status subdirectories    |
-| `bookmarks` | Non-`.md` files anywhere under `bookmarks/local/`                                                                                          |
+| `bookmarks` | Any subdirectory under `bookmarks/local/`; non-`.md` files under `bookmarks/local/`                                                        |
 | `repos`     | Non-directory entries under `repos/local/`                                                                                                  |
 
 ```
