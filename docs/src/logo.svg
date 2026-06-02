@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 110" width="300" height="110">
+  <!-- workbench icon -->
+  <g fill="#F97316">
+    <!-- tabletop (overhangs the legs on both sides) -->
+    <rect x="5" y="8" width="290" height="9" rx="2"/>
+    <!-- left leg -->
+    <rect x="38" y="19" width="10" height="78" rx="1"/>
+    <!-- right leg -->
+    <rect x="248" y="19" width="10" height="78" rx="1"/>
+    <!-- lower shelf (inset between legs) -->
+    <rect x="53" y="74" width="192" height="7" rx="1"/>
+  </g>
+  <!-- banco text inside the table -->
+  <text
+    x="150"
+    y="46"
+    dominant-baseline="middle"
+    text-anchor="middle"
+    font-family="'Courier New', Courier, monospace"
+    font-size="44"
+    font-weight="700"
+    fill="#F97316"
+  >banco</text>
+</svg>
