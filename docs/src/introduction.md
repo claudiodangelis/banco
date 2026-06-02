@@ -1,3 +1,5 @@
+<img src="logo.svg" alt="banco" width="200"/>
+
 # Introduction
 
 Banco Management System, or simply **Banco**, is an opinionated project management tool for
