@@ -5,7 +5,7 @@ use clap_complete::Shell;
 #[command(name = "banco", about = "Banco project management tool")]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand)]

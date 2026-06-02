@@ -25,6 +25,7 @@
 
 # Commands
 
+- [Dashboard](commands/dashboard.md)
 - [init](commands/init.md)
 - [new](commands/new.md)
 - [template](commands/template.md)

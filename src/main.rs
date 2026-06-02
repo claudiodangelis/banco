@@ -265,7 +265,22 @@ fn run() -> anyhow::Result<()> {
     let root = std::env::current_dir().context("failed to get current directory")?;
     let local = LocalProvider::new();
 
-    match cli.command {
+    let Some(command) = cli.command else {
+        let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+        let mut providers = vec![ProviderContext {
+            name: local.name().to_string(),
+            modules: local.context(&root)?,
+        }];
+        for p in remote_providers(&root)? {
+            providers.push(ProviderContext {
+                name: p.name().to_string(),
+                modules: p.context(&root)?,
+            });
+        }
+        return tui::dashboard(&root, ContextOutput { project, providers });
+    };
+
+    match command {
         Commands::Init { update } => {
             let banco_dir = root.join(".banco");
             if update {
