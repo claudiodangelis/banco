@@ -302,19 +302,38 @@ fn module_column_lines(module: &ModuleContext) -> Vec<ColumnLine> {
     ];
 
     if module.name == "tasks" {
-        for status in ["backlog", "doing", "done", "open", "closed"] {
+        const STATUS_ORDER: &[&str] = &[
+            "backlog", "to do", "open",
+            "doing", "in progress", "in review",
+            "done", "closed",
+        ];
+
+        let mut seen = std::collections::HashSet::new();
+        let mut statuses: Vec<String> = module
+            .items
+            .iter()
+            .filter_map(|i| i.get("status").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()))
+            .filter(|s| seen.insert(s.clone()))
+            .collect();
+
+        statuses.sort_by(|a, b| {
+            let pa = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(a)).unwrap_or(STATUS_ORDER.len());
+            let pb = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(b)).unwrap_or(STATUS_ORDER.len());
+            pa.cmp(&pb).then_with(|| a.cmp(b))
+        });
+
+        for status in &statuses {
             let items: Vec<_> = module
                 .items
                 .iter()
-                .filter(|i| i.get("status").and_then(|v| v.as_str()) == Some(status))
+                .filter(|i| i.get("status").and_then(|v| v.as_str()) == Some(status.as_str()))
                 .collect();
-            if items.is_empty() {
-                continue;
-            }
             lines.push(ColumnLine::Group(format!("  {} ({})", status, items.len())));
             for item in items.iter().take(5) {
                 if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
-                    lines.push(ColumnLine::Item(format!("    {}", display_name(name))));
+                    let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                    let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
+                    lines.push(ColumnLine::Item(format!("    {}{}", prefix, display_name(name))));
                 }
             }
         }
