@@ -12,12 +12,9 @@ Press `q` or `Ctrl+C` to exit.
 ## Layout
 
 ```
-━━━━━━━━━━━━━    Last sync:  2026-01-15 09:30:00 (3d ago)
+━━━━━━━━━━━━━    Status:     2026-01-15 09:30:00 (3d ago)  ·  ok
  ┃  banco  ┃    Providers:  local, github
- ┃ ━━━━━━━ ┃    Version:    0.1.0
-┌────────────────────────────────────┐
-│ cloudio/personale/projects/myproj  │
-└────────────────────────────────────┘
+━━━━━━━━━━━━━
 
 ┌ local ──────────────┬──────────────────┬──────────────┐
 │ notes (2)           │ tasks (4)        │ bookmarks (1)│
@@ -31,16 +28,12 @@ Press `q` or `Ctrl+C` to exit.
 
 ### Header
 
-The top-left shows the banco logo. The three lines to its right are:
+The top row shows:
 
 | Field | Source |
 |---|---|
-| **Last sync** | Most recent timestamp across all `.banco/sync-state/` files, with relative age |
+| **Status** | Most recent sync timestamp with relative age, and config check result |
 | **Providers** | Enabled providers from `.banco/config.yml`, always starting with `local` |
-| **Version** | Banco version |
-
-Below the header, the project path is shown relative to `$HOME` (or as an absolute path if
-outside home). The directory part is dimmed; the basename is bright.
 
 ### Provider sections
 
@@ -48,8 +41,8 @@ Each provider with at least one non-empty module gets a box. Modules with zero i
 hidden. Each visible module is a column:
 
 - **notes / bookmarks / repos** — header with item count, then up to 5 most recent names
-- **tasks** — header with total count, then items grouped by status (`backlog`, `doing`, `done`)
-  with up to 5 items per group; task number prefixes are stripped from displayed names
+- **tasks** — header with total count, then items grouped by status with up to 5 items per
+  group; task number prefixes are stripped from displayed names
 
 If the terminal is too narrow to show item details usefully (less than 16 characters per
 column), the columns collapse to headers-only — counts remain visible.
@@ -64,8 +57,50 @@ orange.
 | `j` / `k` | Next / previous provider |
 | `Tab` | Next module (overflows to first module of next provider) |
 | `Shift+Tab` | Previous module (underflows to last module of previous provider) |
+| `Space` | Browse all items in the focused module |
+| `Ctrl+S` | Sync |
 | `?` | Toggle shortcuts overlay |
 | `Esc` | Close shortcuts overlay |
 | `q`, `Ctrl+C` | Quit |
 
 Press `?` at any time to show the shortcuts panel as an overlay over the dashboard.
+
+## Item browser
+
+Pressing `Space` on a focused module opens a full-screen list of all items in that module.
+
+```
+┌ local: tasks (12 items) ────────────────────────────────┐
+│ filter: _                                                │
+├──────────────────────────────────────────────────────────┤
+│ backlog                                                  │
+│   Fix login bug                                          │
+│   Add tests                                             │
+│ doing                                                    │
+│   Review PR                                             │
+└──────────────────────────────────────────────────────────┘
+  Esc/q close  ↑↓/Tab navigate  type to filter  Enter edit
+```
+
+### Filtering
+
+Type any characters to fuzzy-filter items. Label/group headers (e.g. status names) are always
+shown for groups that have at least one matching item, and hidden when all their items are
+filtered out.
+
+### Navigation
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` | Previous / next item (wraps around) |
+| `Tab` / `Shift+Tab` | Next / previous item (wraps around) |
+
+### Editing
+
+Pressing `Enter` opens the selected item in `$EDITOR` (falls back to `vi`). The dashboard
+suspends while the editor runs and resumes when it exits.
+
+Editing is supported for all modules that map to files on disk:
+
+- `local` provider: `notes`, `tasks`
+- Remote providers (`jira`, `github`, `gitlab`): `tasks`
