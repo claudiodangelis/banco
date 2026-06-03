@@ -242,43 +242,103 @@ fn resolve_item_path(root: &Path, provider_name: &str, module_name: &str, item: 
 struct ListRow {
     display: String,
     item_idx: Option<usize>,
+    // 2 = project header, 1 = status/label header, 0 = selectable item
+    level: u8,
+}
+
+fn item_project_key(item: &serde_json::Value) -> Option<String> {
+    if let Some(p) = item.get("project").and_then(|v| v.as_str()) {
+        if !p.is_empty() { return Some(p.to_string()); }
+    }
+    if let (Some(owner), Some(repo)) = (
+        item.get("owner").and_then(|v| v.as_str()),
+        item.get("repo").and_then(|v| v.as_str()),
+    ) {
+        if !owner.is_empty() && !repo.is_empty() {
+            return Some(format!("{}/{}", owner, repo));
+        }
+    }
+    None
+}
+
+fn sorted_statuses(items: impl Iterator<Item = String>) -> Vec<String> {
+    const STATUS_ORDER: &[&str] = &[
+        "backlog", "to do", "open",
+        "doing", "in progress", "in review",
+        "done", "closed",
+    ];
+    let mut seen = std::collections::HashSet::new();
+    let mut statuses: Vec<String> = items
+        .filter(|s| seen.insert(s.clone()))
+        .collect();
+    statuses.sort_by(|a, b| {
+        let pa = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(a)).unwrap_or(STATUS_ORDER.len());
+        let pb = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(b)).unwrap_or(STATUS_ORDER.len());
+        pa.cmp(&pb).then_with(|| a.cmp(b))
+    });
+    statuses
 }
 
 fn build_list_rows(module: &ModuleContext) -> Vec<ListRow> {
     let mut rows = Vec::new();
     if module.name == "tasks" {
-        const STATUS_ORDER: &[&str] = &[
-            "backlog", "to do", "open",
-            "doing", "in progress", "in review",
-            "done", "closed",
-        ];
+        let has_projects = module.items.iter().any(|i| item_project_key(i).is_some());
 
-        let mut seen = std::collections::HashSet::new();
-        let mut statuses: Vec<String> = module
-            .items
-            .iter()
-            .filter_map(|i| i.get("status").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()))
-            .filter(|s| seen.insert(s.clone()))
-            .collect();
-        statuses.sort_by(|a, b| {
-            let pa = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(a)).unwrap_or(STATUS_ORDER.len());
-            let pb = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(b)).unwrap_or(STATUS_ORDER.len());
-            pa.cmp(&pb).then_with(|| a.cmp(b))
-        });
+        if has_projects {
+            let mut seen = std::collections::HashSet::new();
+            let mut projects: Vec<String> = module.items.iter()
+                .filter_map(item_project_key)
+                .filter(|p| seen.insert(p.clone()))
+                .collect();
+            projects.sort();
 
-        for status in &statuses {
-            rows.push(ListRow { display: status.clone(), item_idx: None });
-            for (idx, item) in module.items.iter().enumerate() {
-                if item.get("status").and_then(|v| v.as_str()) != Some(status.as_str()) {
-                    continue;
+            for project in &projects {
+                rows.push(ListRow { display: project.clone(), item_idx: None, level: 2 });
+
+                let statuses = sorted_statuses(
+                    module.items.iter()
+                        .filter(|i| item_project_key(i).as_deref() == Some(project.as_str()))
+                        .filter_map(|i| i.get("status").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()))
+                );
+
+                for status in &statuses {
+                    rows.push(ListRow { display: format!("  {status}"), item_idx: None, level: 1 });
+                    for (idx, item) in module.items.iter().enumerate() {
+                        if item_project_key(item).as_deref() != Some(project.as_str()) { continue; }
+                        if item.get("status").and_then(|v| v.as_str()) != Some(status.as_str()) { continue; }
+                        if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                            let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                            let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
+                            rows.push(ListRow {
+                                display: format!("    {}{}", prefix, display_name(name)),
+                                item_idx: Some(idx),
+                                level: 0,
+                            });
+                        }
+                    }
                 }
-                if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
-                    let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                    let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
-                    rows.push(ListRow {
-                        display: format!("{}{}", prefix, display_name(name)),
-                        item_idx: Some(idx),
-                    });
+            }
+        } else {
+            let statuses = sorted_statuses(
+                module.items.iter()
+                    .filter_map(|i| i.get("status").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()))
+            );
+
+            for status in &statuses {
+                rows.push(ListRow { display: status.clone(), item_idx: None, level: 1 });
+                for (idx, item) in module.items.iter().enumerate() {
+                    if item.get("status").and_then(|v| v.as_str()) != Some(status.as_str()) {
+                        continue;
+                    }
+                    if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                        let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                        let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
+                        rows.push(ListRow {
+                            display: format!("{}{}", prefix, display_name(name)),
+                            item_idx: Some(idx),
+                            level: 0,
+                        });
+                    }
                 }
             }
         }
@@ -302,13 +362,13 @@ fn build_list_rows(module: &ModuleContext) -> Vec<ListRow> {
 
             for (idx, item) in &unlabeled {
                 if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
-                    rows.push(ListRow { display: name.to_string(), item_idx: Some(*idx) });
+                    rows.push(ListRow { display: name.to_string(), item_idx: Some(*idx), level: 0 });
                 }
             }
 
             for label in &labels {
                 if label.is_empty() { continue; }
-                rows.push(ListRow { display: label.clone(), item_idx: None });
+                rows.push(ListRow { display: label.clone(), item_idx: None, level: 1 });
                 for (idx, item) in module.items.iter().enumerate() {
                     if item.get(lk).and_then(|v| v.as_str()) != Some(label.as_str()) {
                         continue;
@@ -317,6 +377,7 @@ fn build_list_rows(module: &ModuleContext) -> Vec<ListRow> {
                         rows.push(ListRow {
                             display: name.to_string(),
                             item_idx: Some(idx),
+                            level: 0,
                         });
                     }
                 }
@@ -324,7 +385,7 @@ fn build_list_rows(module: &ModuleContext) -> Vec<ListRow> {
         } else {
             for (idx, item) in module.items.iter().enumerate() {
                 if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
-                    rows.push(ListRow { display: name.to_string(), item_idx: Some(idx) });
+                    rows.push(ListRow { display: name.to_string(), item_idx: Some(idx), level: 0 });
                 }
             }
         }
@@ -344,11 +405,15 @@ fn show_item_list(stdout: &mut impl Write, root: &Path, provider_name: &str, mod
             let matched: Vec<&ListRow> = all_rows.iter().filter(|r| {
                 r.item_idx.is_none() || fuzzy_match(&filter, &r.display)
             }).collect();
-            // Drop label rows that have no item rows following them before the next label.
+            // Drop header rows that have no item rows in their scope.
+            // A header at level L owns rows until the next header at level >= L.
             let mut out: Vec<&ListRow> = Vec::new();
             for i in 0..matched.len() {
                 if matched[i].item_idx.is_none() {
-                    let has_items = matched[i+1..].iter().take_while(|r| r.item_idx.is_some()).any(|_| true);
+                    let level = matched[i].level;
+                    let has_items = matched[i+1..].iter()
+                        .take_while(|r| r.item_idx.is_some() || r.level < level)
+                        .any(|r| r.item_idx.is_some());
                     if has_items { out.push(matched[i]); }
                 } else {
                     out.push(matched[i]);
@@ -499,9 +564,10 @@ fn render_item_list(
         let inner_w = w.saturating_sub(4); // │·content·│
 
         if row.item_idx.is_none() {
-            // Label/group header — always visible
+            // Label/group header — always visible; project headers (level 2) get accent color
             let text = fit(&format!("  {}", row.display), inner_w);
-            write!(stdout, "{ORANGE}│ {WHITE}{text} {ORANGE}│{RESET}\r\n")?;
+            let color = if row.level >= 2 { ORANGE } else { WHITE };
+            write!(stdout, "{ORANGE}│ {color}{text} {ORANGE}│{RESET}\r\n")?;
         } else if is_selected {
             let text = fit(&format!("  {}", row.display), inner_w);
             write!(stdout, "{ORANGE}│{RESET}\x1b[48;2;60;40;10m{ORANGE}{text} {RESET}{ORANGE}│{RESET}\r\n")?;
@@ -837,38 +903,63 @@ fn module_column_lines(module: &ModuleContext) -> Vec<ColumnLine> {
     ];
 
     if module.name == "tasks" {
-        const STATUS_ORDER: &[&str] = &[
-            "backlog", "to do", "open",
-            "doing", "in progress", "in review",
-            "done", "closed",
-        ];
+        let has_projects = module.items.iter().any(|i| item_project_key(i).is_some());
 
-        let mut seen = std::collections::HashSet::new();
-        let mut statuses: Vec<String> = module
-            .items
-            .iter()
-            .filter_map(|i| i.get("status").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()))
-            .filter(|s| seen.insert(s.clone()))
-            .collect();
-
-        statuses.sort_by(|a, b| {
-            let pa = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(a)).unwrap_or(STATUS_ORDER.len());
-            let pb = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(b)).unwrap_or(STATUS_ORDER.len());
-            pa.cmp(&pb).then_with(|| a.cmp(b))
-        });
-
-        for status in &statuses {
-            let items: Vec<_> = module
-                .items
-                .iter()
-                .filter(|i| i.get("status").and_then(|v| v.as_str()) == Some(status.as_str()))
+        if has_projects {
+            let mut seen = std::collections::HashSet::new();
+            let mut projects: Vec<String> = module.items.iter()
+                .filter_map(item_project_key)
+                .filter(|p| seen.insert(p.clone()))
                 .collect();
-            lines.push(ColumnLine::Group(format!("  {} ({})", status, items.len())));
-            for item in items.iter().take(5) {
-                if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
-                    let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                    let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
-                    lines.push(ColumnLine::Item(format!("    {}{}", prefix, display_name(name))));
+            projects.sort();
+
+            let mut item_budget = 5usize;
+            'projects: for project in &projects {
+                let project_items: Vec<_> = module.items.iter()
+                    .filter(|i| item_project_key(i).as_deref() == Some(project.as_str()))
+                    .collect();
+                lines.push(ColumnLine::Group(format!("  {} ({})", project, project_items.len())));
+
+                let statuses = sorted_statuses(
+                    project_items.iter()
+                        .filter_map(|i| i.get("status").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()))
+                );
+
+                for status in &statuses {
+                    let status_items: Vec<_> = project_items.iter()
+                        .filter(|i| i.get("status").and_then(|v| v.as_str()) == Some(status.as_str()))
+                        .collect();
+                    lines.push(ColumnLine::Group(format!("    {} ({})", status, status_items.len())));
+                    for item in status_items.iter().take(item_budget) {
+                        if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                            let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                            let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
+                            lines.push(ColumnLine::Item(format!("      {}{}", prefix, display_name(name))));
+                            item_budget = item_budget.saturating_sub(1);
+                            if item_budget == 0 { break 'projects; }
+                        }
+                    }
+                }
+            }
+        } else {
+            let statuses = sorted_statuses(
+                module.items.iter()
+                    .filter_map(|i| i.get("status").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()))
+            );
+
+            for status in &statuses {
+                let items: Vec<_> = module
+                    .items
+                    .iter()
+                    .filter(|i| i.get("status").and_then(|v| v.as_str()) == Some(status.as_str()))
+                    .collect();
+                lines.push(ColumnLine::Group(format!("  {} ({})", status, items.len())));
+                for item in items.iter().take(5) {
+                    if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                        let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                        let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
+                        lines.push(ColumnLine::Item(format!("    {}{}", prefix, display_name(name))));
+                    }
                 }
             }
         }
