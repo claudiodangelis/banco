@@ -46,11 +46,12 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
     let mut focus_p: usize = 0;
     let mut focus_m: usize = 0;
     let mut show_help = false;
+    let mut sync_status: Option<(&'static str, &'static str)> = None; // (color, msg)
 
     macro_rules! redraw {
         ($stdout:expr) => {{
             execute!($stdout, terminal::Clear(ClearType::All), cursor::MoveTo(0, 0))?;
-            render_main($stdout, root, ctx, focus_p, focus_m)?;
+            render_main($stdout, root, ctx, focus_p, focus_m, sync_status)?;
             $stdout.flush()?;
         }};
     }
@@ -95,6 +96,22 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
                         redraw!(stdout);
                     }
 
+                    (KeyCode::Char('s'), KeyModifiers::CONTROL) if !show_help => {
+                        sync_status = Some((GRAY, "syncing…"));
+                        redraw!(stdout);
+                        let exe = std::env::current_exe().unwrap_or_else(|_| "banco".into());
+                        let ok = std::process::Command::new(&exe)
+                            .arg("sync")
+                            .current_dir(root)
+                            .stdout(std::process::Stdio::null())
+                            .stderr(std::process::Stdio::null())
+                            .status()
+                            .map(|s| s.success())
+                            .unwrap_or(false);
+                        sync_status = Some(if ok { (GREEN, "sync ok") } else { (RED, "sync failed") });
+                        redraw!(stdout);
+                    }
+
                     _ => {}
                 }
             }
@@ -104,27 +121,24 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
     Ok(())
 }
 
-fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_p: usize, focus_m: usize) -> anyhow::Result<()> {
+fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_p: usize, focus_m: usize, sync_status: Option<(&str, &str)>) -> anyhow::Result<()> {
     let project_name = root.file_name().and_then(|s| s.to_str()).unwrap_or("?");
 
     let sync = last_sync(root);
     let providers_str = enabled_providers(root);
     let (check_color, check_str) = check_status(root);
-    let version = env!("CARGO_PKG_VERSION");
-    let status_val = format!("{GRAY}{sync}  ·  {check_color}{check_str}");
+    let status_val = format!("{GRAY}{sync}  ·  {check_color}{check_str}{RESET}");
 
     // "  banco: " (9) + project_name + "  " (2) = inner display width
     let inner = 11 + project_name.chars().count();
-    let top = "━".repeat(inner + 4); // " ┃" + inner + "┃ "
-    let mid = "━".repeat(inner - 2); // " ┃ " + dashes + " ┃ "
+    let top = "━".repeat(inner + 4);
 
-    write!(stdout, "{ORANGE}{top}{RESET}    {GRAY}Status: {RESET}{status_val}{RESET}\r\n")?;
+    write!(stdout, "{ORANGE}{top}{RESET}    {GRAY}Status: {RESET}{status_val}\r\n")?;
     write!(stdout, "{ORANGE} ┃  banco{RESET}: {WHITE}{project_name}  {ORANGE}┃ {RESET}    {GRAY}Providers: {RESET}{WHITE}{providers_str}{RESET}\r\n")?;
-    write!(stdout, "{ORANGE} ┃ {mid} ┃ {RESET}    {GRAY}Version: {RESET}{WHITE}{version}{RESET}\r\n")?;
 
     write!(stdout, "\r\n")?;
 
-    let (term_width, _) = terminal::size().unwrap_or((80, 24));
+    let (term_width, term_height) = terminal::size().unwrap_or((80, 24));
 
     let mut vp_idx = 0usize;
     for provider in &ctx.providers {
@@ -138,6 +152,16 @@ fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_
         vp_idx += 1;
     }
 
+    let bottom_row = term_height.saturating_sub(1);
+    execute!(stdout, cursor::MoveTo(0, bottom_row))?;
+    let (fg, text) = match sync_status {
+        Some((color, msg)) => (color, msg.to_string()),
+        None => (WHITE, root.to_string_lossy().into_owned()),
+    };
+    let display_len = 1 + text.chars().count(); // leading space + text
+    let padding = " ".repeat((term_width as usize).saturating_sub(display_len));
+    write!(stdout, "\x1b[48;2;40;40;40m {fg}{text}{RESET}\x1b[48;2;40;40;40m{padding}{RESET}")?;
+
     Ok(())
 }
 
@@ -148,6 +172,7 @@ fn render_help_overlay(stdout: &mut impl Write) -> anyhow::Result<()> {
         ("j / k",      "next / prev provider"),
         ("Tab",        "next module"),
         ("Shift+Tab",  "prev module"),
+        ("Ctrl+S",     "sync"),
         ("q",          "quit"),
         ("Ctrl+C",     "quit"),
     ];
