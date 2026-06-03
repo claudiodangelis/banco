@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crossterm::{
     cursor,
@@ -47,6 +47,19 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
     let mut focus_m: usize = 0;
     let mut show_help = false;
     let mut sync_status: Option<(&'static str, &'static str)> = None; // (color, msg)
+
+    // Build a flat index: (visible_provider_idx) -> (provider_idx, [visible_module_idxs])
+    let vp_map: Vec<(usize, Vec<usize>)> = ctx.providers.iter()
+        .enumerate()
+        .filter_map(|(pi, p)| {
+            let vis: Vec<usize> = p.modules.iter()
+                .enumerate()
+                .filter(|(_, m)| !m.items.is_empty())
+                .map(|(mi, _)| mi)
+                .collect();
+            if vis.is_empty() { None } else { Some((pi, vis)) }
+        })
+        .collect();
 
     macro_rules! redraw {
         ($stdout:expr) => {{
@@ -96,6 +109,15 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
                         redraw!(stdout);
                     }
 
+                    (KeyCode::Char(' '), KeyModifiers::NONE) if !show_help && total_vp > 0 => {
+                        let (pi, ref vis_mods) = vp_map[focus_p];
+                        let mi = vis_mods[focus_m];
+                        let provider = &ctx.providers[pi];
+                        let module = &provider.modules[mi];
+                        show_item_list(stdout, root, &provider.name, module)?;
+                        redraw!(stdout);
+                    }
+
                     (KeyCode::Char('s'), KeyModifiers::CONTROL) if !show_help => {
                         sync_status = Some((GRAY, "syncing…"));
                         redraw!(stdout);
@@ -120,6 +142,344 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
 
     Ok(())
 }
+
+// ── item list overlay ────────────────────────────────────────────────────────
+
+fn fuzzy_match(query: &str, target: &str) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+    let q = query.to_lowercase();
+    let t = target.to_lowercase();
+    let mut qi = q.chars();
+    let mut next = qi.next();
+    for c in t.chars() {
+        if Some(c) == next {
+            next = qi.next();
+        }
+        if next.is_none() {
+            return true;
+        }
+    }
+    false
+}
+
+fn resolve_item_path(root: &Path, provider_name: &str, module_name: &str, item: &serde_json::Value) -> Option<PathBuf> {
+    match (provider_name, module_name) {
+        ("local", "notes") => {
+            let name = item.get("name")?.as_str()?;
+            let label = item.get("label").and_then(|v| v.as_str()).unwrap_or("");
+            let base = root.join("notes/local");
+            let dir = if label.is_empty() { base } else { base.join(label) };
+            Some(dir.join(format!("{}.md", name)))
+        }
+        ("local", "tasks") => {
+            let name = item.get("name")?.as_str()?;
+            let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("backlog");
+            let dir = root.join("tasks/local").join(status);
+            Some(dir.join(format!("{}.md", name)))
+        }
+        (_, "tasks") => {
+            // Remote providers (jira, github, gitlab): tasks/{provider}/{id} - {name}.md
+            let id = item.get("id").and_then(|v| v.as_str())?;
+            let name = item.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let dir = root.join("tasks").join(provider_name);
+            Some(dir.join(format!("{} - {}.md", id, name)))
+        }
+        _ => None,
+    }
+}
+
+struct ListRow {
+    display: String,
+    item_idx: Option<usize>,
+}
+
+fn build_list_rows(module: &ModuleContext) -> Vec<ListRow> {
+    let mut rows = Vec::new();
+    if module.name == "tasks" {
+        const STATUS_ORDER: &[&str] = &[
+            "backlog", "to do", "open",
+            "doing", "in progress", "in review",
+            "done", "closed",
+        ];
+
+        let mut seen = std::collections::HashSet::new();
+        let mut statuses: Vec<String> = module
+            .items
+            .iter()
+            .filter_map(|i| i.get("status").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()))
+            .filter(|s| seen.insert(s.clone()))
+            .collect();
+        statuses.sort_by(|a, b| {
+            let pa = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(a)).unwrap_or(STATUS_ORDER.len());
+            let pb = STATUS_ORDER.iter().position(|&p| p.eq_ignore_ascii_case(b)).unwrap_or(STATUS_ORDER.len());
+            pa.cmp(&pb).then_with(|| a.cmp(b))
+        });
+
+        for status in &statuses {
+            rows.push(ListRow { display: status.clone(), item_idx: None });
+            for (idx, item) in module.items.iter().enumerate() {
+                if item.get("status").and_then(|v| v.as_str()) != Some(status.as_str()) {
+                    continue;
+                }
+                if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                    let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                    let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
+                    rows.push(ListRow {
+                        display: format!("{}{}", prefix, display_name(name)),
+                        item_idx: Some(idx),
+                    });
+                }
+            }
+        }
+    } else {
+        let label_key = match module.name.as_str() {
+            "notes" => Some("label"),
+            _ => None,
+        };
+        if let Some(lk) = label_key {
+            let mut seen = std::collections::HashSet::new();
+            let mut labels: Vec<String> = module.items.iter()
+                .filter_map(|i| i.get(lk).and_then(|v| v.as_str()).map(|s| s.to_string()))
+                .filter(|s| seen.insert(s.clone()))
+                .collect();
+            labels.sort();
+
+            let unlabeled: Vec<(usize, &serde_json::Value)> = module.items.iter()
+                .enumerate()
+                .filter(|(_, i)| i.get(lk).and_then(|v| v.as_str()).map_or(true, |s| s.is_empty()))
+                .collect();
+
+            for (idx, item) in &unlabeled {
+                if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                    rows.push(ListRow { display: name.to_string(), item_idx: Some(*idx) });
+                }
+            }
+
+            for label in &labels {
+                if label.is_empty() { continue; }
+                rows.push(ListRow { display: label.clone(), item_idx: None });
+                for (idx, item) in module.items.iter().enumerate() {
+                    if item.get(lk).and_then(|v| v.as_str()) != Some(label.as_str()) {
+                        continue;
+                    }
+                    if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                        rows.push(ListRow {
+                            display: name.to_string(),
+                            item_idx: Some(idx),
+                        });
+                    }
+                }
+            }
+        } else {
+            for (idx, item) in module.items.iter().enumerate() {
+                if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                    rows.push(ListRow { display: name.to_string(), item_idx: Some(idx) });
+                }
+            }
+        }
+    }
+    rows
+}
+
+fn show_item_list(stdout: &mut impl Write, root: &Path, provider_name: &str, module: &ModuleContext) -> anyhow::Result<()> {
+    let can_edit = provider_name == "local" && (module.name == "notes" || module.name == "tasks");
+    let all_rows = build_list_rows(module);
+
+    let mut filter = String::new();
+    let mut cursor_pos: usize = 0; // index into filtered selectable rows
+
+    macro_rules! filtered_rows {
+        () => {{
+            let matched: Vec<&ListRow> = all_rows.iter().filter(|r| {
+                r.item_idx.is_none() || fuzzy_match(&filter, &r.display)
+            }).collect();
+            // Drop label rows that have no item rows following them before the next label.
+            let mut out: Vec<&ListRow> = Vec::new();
+            for i in 0..matched.len() {
+                if matched[i].item_idx.is_none() {
+                    let has_items = matched[i+1..].iter().take_while(|r| r.item_idx.is_some()).any(|_| true);
+                    if has_items { out.push(matched[i]); }
+                } else {
+                    out.push(matched[i]);
+                }
+            }
+            out
+        }};
+    }
+
+    macro_rules! selectable_indices {
+        ($rows:expr) => {{
+            $rows.iter().enumerate()
+                .filter(|(_, r)| r.item_idx.is_some())
+                .map(|(i, _)| i)
+                .collect::<Vec<_>>()
+        }};
+    }
+
+    let mut dirty = true;
+    loop {
+        if dirty {
+            let rows = filtered_rows!();
+            let sel_indices = selectable_indices!(rows);
+            let n_sel = sel_indices.len();
+            if cursor_pos >= n_sel && n_sel > 0 {
+                cursor_pos = n_sel - 1;
+            }
+            queue!(stdout, terminal::Clear(ClearType::All), cursor::MoveTo(0, 0))?;
+            render_item_list(stdout, provider_name, module, &rows, &sel_indices, cursor_pos, &filter, can_edit)?;
+            stdout.flush()?;
+            dirty = false;
+        }
+
+        if event::poll(std::time::Duration::from_millis(200))? {
+            if let Event::Key(key) = event::read()? {
+                let rows = filtered_rows!();
+                let sel_indices = selectable_indices!(rows);
+                let n_sel = sel_indices.len();
+                if cursor_pos >= n_sel && n_sel > 0 {
+                    cursor_pos = n_sel - 1;
+                }
+
+                match (key.code, key.modifiers) {
+                    (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::NONE) => break,
+
+                    (KeyCode::Up, _) | (KeyCode::BackTab, _) if n_sel > 0 => {
+                        cursor_pos = if cursor_pos == 0 { n_sel - 1 } else { cursor_pos - 1 };
+                        dirty = true;
+                    }
+                    (KeyCode::Down, _) | (KeyCode::Tab, KeyModifiers::NONE) if n_sel > 0 => {
+                        cursor_pos = (cursor_pos + 1) % n_sel;
+                        dirty = true;
+                    }
+
+                    (KeyCode::Backspace, _) => {
+                        filter.pop();
+                        cursor_pos = 0;
+                        dirty = true;
+                    }
+                    (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+                        filter.push(c);
+                        cursor_pos = 0;
+                        dirty = true;
+                    }
+
+                    (KeyCode::Enter, _) if n_sel > 0 => {
+                        let row_idx = sel_indices[cursor_pos];
+                        let row = rows[row_idx];
+                        if let Some(item_idx) = row.item_idx {
+                            let item = &module.items[item_idx];
+                            if let Some(path) = resolve_item_path(root, provider_name, &module.name, item) {
+                                let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+                                execute!(stdout, cursor::Show, LeaveAlternateScreen)?;
+                                terminal::disable_raw_mode()?;
+
+                                let _ = std::process::Command::new(&editor)
+                                    .arg(&path)
+                                    .status();
+
+                                terminal::enable_raw_mode()?;
+                                execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
+                                dirty = true;
+                            }
+                        }
+                    }
+
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn render_item_list(
+    stdout: &mut impl Write,
+    provider_name: &str,
+    module: &ModuleContext,
+    rows: &[&ListRow],
+    sel_indices: &[usize],
+    cursor_pos: usize,
+    filter: &str,
+    can_edit: bool,
+) -> anyhow::Result<()> {
+    let (term_width, term_height) = terminal::size().unwrap_or((80, 24));
+    let w = term_width as usize;
+
+    let selected_row = sel_indices.get(cursor_pos).copied();
+
+    let title = format!(" {}: {} ({} items) ", provider_name, module.name, module.items.len());
+    let title_len = title.chars().count();
+    let bar = "─".repeat(w.saturating_sub(title_len + 2));
+    write!(stdout, "{ORANGE}┌{title}{bar}┐{RESET}\r\n")?;
+
+    // Filter bar
+    let filter_display = format!(" filter: {}_", filter);
+    let fpad = w.saturating_sub(filter_display.chars().count() + 2);
+    write!(stdout, "{ORANGE}│{RESET}{WHITE}{}{}{ORANGE}│{RESET}\r\n",
+        filter_display, " ".repeat(fpad))?;
+    write!(stdout, "{ORANGE}├{}┤{RESET}\r\n", "─".repeat(w.saturating_sub(2)))?;
+
+    let list_height = (term_height as usize).saturating_sub(6); // header(3) + footer(2) + bottom border(1)
+
+    // Scroll so selected item is visible
+    let scroll_offset = if let Some(si) = selected_row {
+        let n_sel = sel_indices.len();
+        if n_sel == 0 {
+            0
+        } else {
+            let mid = list_height / 2;
+            if cursor_pos > mid {
+                let max_scroll = rows.len().saturating_sub(list_height);
+                (si.saturating_sub(mid)).min(max_scroll)
+            } else {
+                0
+            }
+        }
+    } else {
+        0
+    };
+
+    let visible_rows = rows.iter().enumerate().skip(scroll_offset).take(list_height);
+    let mut shown = 0usize;
+
+    for (ri, row) in visible_rows {
+        let is_selected = Some(ri) == selected_row;
+        let inner_w = w.saturating_sub(4); // │·content·│
+
+        if row.item_idx.is_none() {
+            // Label/group header — always visible
+            let text = fit(&format!("  {}", row.display), inner_w);
+            write!(stdout, "{ORANGE}│ {WHITE}{text} {ORANGE}│{RESET}\r\n")?;
+        } else if is_selected {
+            let text = fit(&format!("  {}", row.display), inner_w);
+            write!(stdout, "{ORANGE}│{RESET}\x1b[48;2;60;40;10m{ORANGE}{text} {RESET}{ORANGE}│{RESET}\r\n")?;
+        } else {
+            let text = fit(&format!("  {}", row.display), inner_w);
+            write!(stdout, "{ORANGE}│ {GRAY}{text}{RESET} {ORANGE}│{RESET}\r\n")?;
+        }
+        shown += 1;
+    }
+
+    for _ in shown..list_height {
+        write!(stdout, "{ORANGE}│{}│{RESET}\r\n", " ".repeat(w.saturating_sub(2)))?;
+    }
+
+    write!(stdout, "{ORANGE}└{}┘{RESET}\r\n", "─".repeat(w.saturating_sub(2)))?;
+
+    // Footer hints
+    let edit_hint = if can_edit { "  Enter edit" } else { "" };
+    let hint = format!("  Esc/q close  ↑↓/Tab navigate  type to filter{}", edit_hint);
+    let hpad = w.saturating_sub(hint.chars().count());
+    execute!(stdout, cursor::MoveTo(0, term_height - 1))?;
+    write!(stdout, "\x1b[48;2;40;40;40m{GRAY}{}{}{RESET}", hint, " ".repeat(hpad))?;
+
+    Ok(())
+}
+
+// ── main dashboard rendering ─────────────────────────────────────────────────
 
 fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_p: usize, focus_m: usize, sync_status: Option<(&str, &str)>) -> anyhow::Result<()> {
     let project_name = root.file_name().and_then(|s| s.to_str()).unwrap_or("?");
@@ -172,6 +532,7 @@ fn render_help_overlay(stdout: &mut impl Write) -> anyhow::Result<()> {
         ("j / k",      "next / prev provider"),
         ("Tab",        "next module"),
         ("Shift+Tab",  "prev module"),
+        ("Space",      "browse module items"),
         ("Ctrl+S",     "sync"),
         ("q",          "quit"),
         ("Ctrl+C",     "quit"),
@@ -441,7 +802,7 @@ fn render_provider_section(
                     let c = if focused_col == Some(ci) { ORANGE } else { WHITE };
                     (c, s.clone())
                 }
-                Some(ColumnLine::Group(s)) => (ORANGE, s.clone()),
+                Some(ColumnLine::Group(s)) => (WHITE, s.clone()),
                 Some(ColumnLine::Item(s)) => (GRAY, s.clone()),
             };
             write!(stdout, "{color}{}{RESET}{border}│{RESET}", fit(&text, w))?;
