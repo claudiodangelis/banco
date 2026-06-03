@@ -11,10 +11,13 @@ use crossterm::{
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 
 use crate::context::{ContextOutput, Label, ModuleContext, ProviderContext};
+use crate::providers::local::LocalProvider;
 
 const ORANGE: &str = "\x1b[38;2;249;115;22m";
 const GRAY: &str = "\x1b[90m";
 const WHITE: &str = "\x1b[97m";
+const GREEN: &str = "\x1b[32m";
+const RED: &str = "\x1b[31m";
 const RESET: &str = "\x1b[0m";
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -102,38 +105,22 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
 }
 
 fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_p: usize, focus_m: usize) -> anyhow::Result<()> {
-    let logo = [
-        "━━━━━━━━━━━━━",
-        " ┃  banco  ┃ ",
-        " ┃ ━━━━━━━ ┃ ",
-    ];
+    let project_name = root.file_name().and_then(|s| s.to_str()).unwrap_or("?");
 
     let sync = last_sync(root);
     let providers_str = enabled_providers(root);
+    let (check_color, check_str) = check_status(root);
     let version = env!("CARGO_PKG_VERSION");
-    let info: [(&str, &str); 3] = [
-        ("Last sync", &sync),
-        ("Providers", &providers_str),
-        ("Version",   version),
-    ];
+    let status_val = format!("{GRAY}{sync}  ·  {check_color}{check_str}");
 
-    for (logo_line, (label, value)) in logo.iter().zip(info.iter()) {
-        write!(stdout, "{ORANGE}{logo_line}{RESET}    {GRAY}{label}: {RESET}{WHITE}{value}{RESET}\r\n")?;
-    }
+    // "  banco: " (9) + project_name + "  " (2) = inner display width
+    let inner = 11 + project_name.chars().count();
+    let top = "━".repeat(inner + 4); // " ┃" + inner + "┃ "
+    let mid = "━".repeat(inner - 2); // " ┃ " + dashes + " ┃ "
 
-    let display = std::env::var_os("HOME")
-        .map(std::path::PathBuf::from)
-        .and_then(|home| root.strip_prefix(&home).ok().map(|r| r.to_string_lossy().into_owned()))
-        .unwrap_or_else(|| root.to_string_lossy().into_owned());
-
-    let basename = root.file_name().and_then(|s| s.to_str()).unwrap_or(&display);
-    let dir_part = display.strip_suffix(basename).unwrap_or("");
-
-    let inner_len = dir_part.chars().count() + basename.chars().count();
-    let bar = "─".repeat(inner_len + 2);
-    write!(stdout, "{GRAY}┌{bar}┐{RESET}\r\n")?;
-    write!(stdout, "{GRAY}│ {dir_part}{WHITE}{basename}{GRAY} │{RESET}\r\n")?;
-    write!(stdout, "{GRAY}└{bar}┘{RESET}\r\n")?;
+    write!(stdout, "{ORANGE}{top}{RESET}    {GRAY}Status: {RESET}{status_val}{RESET}\r\n")?;
+    write!(stdout, "{ORANGE} ┃  banco{RESET}: {WHITE}{project_name}  {ORANGE}┃ {RESET}    {GRAY}Providers: {RESET}{WHITE}{providers_str}{RESET}\r\n")?;
+    write!(stdout, "{ORANGE} ┃ {mid} ┃ {RESET}    {GRAY}Version: {RESET}{WHITE}{version}{RESET}\r\n")?;
 
     write!(stdout, "\r\n")?;
 
@@ -233,6 +220,45 @@ fn last_sync(root: &Path) -> String {
             Some(rel) => format!("{ts} ({rel})"),
             None => ts,
         },
+    }
+}
+
+fn check_status(root: &Path) -> (&'static str, String) {
+    let local = LocalProvider::new();
+    let findings = match local.check(root) {
+        Ok(f) => f,
+        Err(_) => return (RED, "error".to_string()),
+    };
+    let config_issues = crate::config::load(root)
+        .map(|cfg| {
+            let mut issues = 0usize;
+            for entry in &cfg.providers {
+                let schema = match entry.name.as_str() {
+                    "github" => crate::providers::github::GitHubProvider::available_config_schema(),
+                    "gitlab" => crate::providers::gitlab::GitLabProvider::available_config_schema(),
+                    "jira"   => crate::providers::jira::JiraProvider::available_config_schema(),
+                    _        => continue,
+                };
+                let known: std::collections::HashSet<&str> = schema.iter().map(|p| p.name).collect();
+                for key in entry.config.keys() {
+                    if !known.contains(key.as_str()) { issues += 1; }
+                }
+                for param in &schema {
+                    if param.required && !entry.config.contains_key(param.name) { issues += 1; }
+                }
+            }
+            issues
+        })
+        .unwrap_or(0);
+
+    let issue_count = findings.extraneous_dirs.len()
+        + findings.extraneous_module_paths.len()
+        + config_issues;
+
+    if issue_count == 0 {
+        (GREEN, "ok".to_string())
+    } else {
+        (RED, format!("{issue_count} issue{}", if issue_count == 1 { "" } else { "s" }))
     }
 }
 
