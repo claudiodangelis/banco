@@ -98,11 +98,10 @@ New task files are initialized from the first matching template found under `.ba
 `jira/TEMPLATE.md` → `tasks/TEMPLATE.md`.
 See [Templates](../templates.md) for details.
 
-## Incremental sync
+## Sync
 
-After a successful sync, banco stores the timestamp in `.banco/sync-state/<provider>` and
-includes it in the prompt sent to the agent backend, asking for only issues updated since that
-point. The first sync always fetches everything.
+After a successful sync, banco stores the timestamp in `.banco/sync-state/<provider>`. On every
+sync, all currently non-done issues are fetched.
 
 After writing the fetched issues, banco reconciles local tasks: any local task whose status is not
 `Done` and whose ID was not in the fetched set is marked `Done` — it was completed on JIRA and

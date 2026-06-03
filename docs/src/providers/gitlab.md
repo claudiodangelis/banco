@@ -79,11 +79,10 @@ New task files are initialized from the first matching template found under `.ba
 `gitlab/<project>/TEMPLATE.md` → `gitlab/TEMPLATE.md` → `tasks/TEMPLATE.md`.
 See [Templates](../templates.md) for details.
 
-## Incremental sync
+## Sync
 
-After a successful sync, banco stores the timestamp in `.banco/sync-state/<provider>` and passes
-it as the `updated_after` parameter on subsequent API calls. Only open issues updated after that
-point are fetched.
+After a successful sync, banco stores the timestamp in `.banco/sync-state/<provider>`. On every
+sync, all currently-open issues are fetched.
 
 After writing the fetched issues, banco reconciles local tasks: any local task with `status: open`
 whose issue IID was not in the fetched set is marked `closed` — it was closed on GitLab and
