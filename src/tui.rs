@@ -13,6 +13,50 @@ use dialoguer::{Input, Select, theme::ColorfulTheme};
 use crate::context::{ContextOutput, Label, ModuleContext, ProviderContext};
 use crate::providers::local::LocalProvider;
 
+struct CheckDetail {
+    config_issues: Vec<(String, Vec<String>)>, // (provider_display_name, [issue descriptions])
+    extraneous_dirs: Vec<PathBuf>,
+    extraneous_module_paths: Vec<PathBuf>,
+}
+
+fn gather_check_details(root: &Path) -> anyhow::Result<CheckDetail> {
+    let local = LocalProvider::new();
+    let findings = local.check(root)?;
+
+    let mut config_issues: Vec<(String, Vec<String>)> = Vec::new();
+    if let Ok(cfg) = crate::config::load(root) {
+        for entry in &cfg.providers {
+            let schema = match entry.name.as_str() {
+                "github" => crate::providers::github::GitHubProvider::available_config_schema(),
+                "gitlab" => crate::providers::gitlab::GitLabProvider::available_config_schema(),
+                "jira"   => crate::providers::jira::JiraProvider::available_config_schema(),
+                _        => continue,
+            };
+            let known: std::collections::HashSet<&str> = schema.iter().map(|p| p.name).collect();
+            let mut issues = Vec::new();
+            for key in entry.config.keys() {
+                if !known.contains(key.as_str()) {
+                    issues.push(format!("unknown key: {}", key));
+                }
+            }
+            for param in &schema {
+                if param.required && !entry.config.contains_key(param.name) {
+                    issues.push(format!("missing required: {}", param.name));
+                }
+            }
+            if !issues.is_empty() {
+                config_issues.push((entry.display_name().to_string(), issues));
+            }
+        }
+    }
+
+    Ok(CheckDetail {
+        config_issues,
+        extraneous_dirs: findings.extraneous_dirs,
+        extraneous_module_paths: findings.extraneous_module_paths,
+    })
+}
+
 const ORANGE: &str = "\x1b[38;2;249;115;22m";
 const GRAY: &str = "\x1b[90m";
 const WHITE: &str = "\x1b[97m";
@@ -115,6 +159,11 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
                         let provider = &ctx.providers[pi];
                         let module = &provider.modules[mi];
                         show_item_list(stdout, root, &provider.name, module)?;
+                        redraw!(stdout);
+                    }
+
+                    (KeyCode::Char('d'), KeyModifiers::NONE) if !show_help => {
+                        show_check_panel(stdout, root)?;
                         redraw!(stdout);
                     }
 
@@ -533,6 +582,7 @@ fn render_help_overlay(stdout: &mut impl Write) -> anyhow::Result<()> {
         ("Tab",        "next module"),
         ("Shift+Tab",  "prev module"),
         ("Space",      "browse module items"),
+        ("d",          "check panel"),
         ("Ctrl+S",     "sync"),
         ("q",          "quit"),
         ("Ctrl+C",     "quit"),
@@ -562,6 +612,129 @@ fn render_help_overlay(stdout: &mut impl Write) -> anyhow::Result<()> {
 
     execute!(stdout, cursor::MoveTo(col, row + panel_h - 1))?;
     write!(stdout, "{GRAY}└{}┘{RESET}", "─".repeat(inner + 2))?;
+
+    Ok(())
+}
+
+// ── check panel ─────────────────────────────────────────────────────────────
+
+fn show_check_panel(stdout: &mut impl Write, root: &Path) -> anyhow::Result<()> {
+    let detail = gather_check_details(root).unwrap_or_else(|_| CheckDetail {
+        config_issues: vec![("error".to_string(), vec!["failed to gather check details".to_string()])],
+        extraneous_dirs: vec![],
+        extraneous_module_paths: vec![],
+    });
+
+    render_check_panel(stdout, root, &detail)?;
+    stdout.flush()?;
+
+    loop {
+        if event::poll(std::time::Duration::from_millis(200))? {
+            if let Event::Key(key) = event::read()? {
+                match (key.code, key.modifiers) {
+                    (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::NONE) => break,
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn render_check_panel(stdout: &mut impl Write, root: &Path, detail: &CheckDetail) -> anyhow::Result<()> {
+    let (tw, th) = terminal::size().unwrap_or((80, 24));
+
+    let total_issues = detail.config_issues.iter().map(|(_, v)| v.len()).sum::<usize>()
+        + detail.extraneous_dirs.len()
+        + detail.extraneous_module_paths.len();
+
+    // Build content lines: (color, text)
+    let mut content: Vec<(&'static str, String)> = Vec::new();
+
+    if total_issues == 0 {
+        content.push((GREEN, "  ✓  No issues found".to_string()));
+    } else {
+        content.push((WHITE, format!("  {} issue{} found:", total_issues, if total_issues == 1 { "" } else { "s" })));
+
+        if !detail.config_issues.is_empty() {
+            content.push((WHITE, String::new()));
+            content.push((ORANGE, "  Config".to_string()));
+            for (provider, issues) in &detail.config_issues {
+                content.push((WHITE, format!("    {}", provider)));
+                for issue in issues {
+                    content.push((RED, format!("      ✗  {}", issue)));
+                }
+            }
+        }
+
+        if !detail.extraneous_dirs.is_empty() {
+            content.push((WHITE, String::new()));
+            content.push((ORANGE, "  Extraneous directories".to_string()));
+            for path in &detail.extraneous_dirs {
+                let display = path.strip_prefix(root)
+                    .map(|r| format!("./{}", r.display()))
+                    .unwrap_or_else(|_| path.display().to_string());
+                content.push((RED, format!("    ✗  {}", display)));
+            }
+        }
+
+        if !detail.extraneous_module_paths.is_empty() {
+            content.push((WHITE, String::new()));
+            content.push((ORANGE, "  Extraneous module paths".to_string()));
+            for path in &detail.extraneous_module_paths {
+                let display = path.strip_prefix(root)
+                    .map(|r| format!("./{}", r.display()))
+                    .unwrap_or_else(|_| path.display().to_string());
+                content.push((RED, format!("    ✗  {}", display)));
+            }
+        }
+    }
+
+    const HINT: &str = "Esc  close";
+
+    // inner_w: widest content line or hint, capped to leave a margin
+    let max_line = content.iter().map(|(_, s)| s.chars().count()).max().unwrap_or(0);
+    let inner_w = max_line.max(HINT.len() + 2).min(tw as usize - 4);
+
+    // rows: top + blank + content... + blank + hint + bottom
+    let panel_h = (content.len() + 4) as u16;
+    let panel_w = (inner_w + 4) as u16;
+
+    let col = tw.saturating_sub(panel_w) / 2;
+    let row = th.saturating_sub(panel_h) / 2;
+
+    let title = " check ";
+    let top_dashes = (inner_w + 2).saturating_sub(title.len());
+
+    // top border
+    execute!(stdout, cursor::MoveTo(col, row))?;
+    write!(stdout, "{ORANGE}┌{title}{}┐{RESET}", "─".repeat(top_dashes))?;
+
+    // blank
+    execute!(stdout, cursor::MoveTo(col, row + 1))?;
+    write!(stdout, "{ORANGE}│{}│{RESET}", " ".repeat(inner_w + 2))?;
+
+    // content lines
+    for (i, (color, text)) in content.iter().enumerate() {
+        execute!(stdout, cursor::MoveTo(col, row + 2 + i as u16))?;
+        let fitted = fit(text, inner_w);
+        write!(stdout, "{ORANGE}│ {color}{fitted}{RESET} {ORANGE}│{RESET}")?;
+    }
+
+    // blank before hint
+    let hint_row = row + 2 + content.len() as u16;
+    execute!(stdout, cursor::MoveTo(col, hint_row))?;
+    write!(stdout, "{ORANGE}│{}│{RESET}", " ".repeat(inner_w + 2))?;
+
+    // hint (right-aligned)
+    execute!(stdout, cursor::MoveTo(col, hint_row + 1))?;
+    let pad = inner_w.saturating_sub(HINT.len());
+    write!(stdout, "{ORANGE}│ {GRAY}{}{}{RESET} {ORANGE}│{RESET}", " ".repeat(pad), HINT)?;
+
+    // bottom border
+    execute!(stdout, cursor::MoveTo(col, hint_row + 2))?;
+    write!(stdout, "{ORANGE}└{}┘{RESET}", "─".repeat(inner_w + 2))?;
 
     Ok(())
 }
@@ -610,37 +783,13 @@ fn last_sync(root: &Path) -> String {
 }
 
 fn check_status(root: &Path) -> (&'static str, String) {
-    let local = LocalProvider::new();
-    let findings = match local.check(root) {
-        Ok(f) => f,
+    let detail = match gather_check_details(root) {
+        Ok(d) => d,
         Err(_) => return (RED, "error".to_string()),
     };
-    let config_issues = crate::config::load(root)
-        .map(|cfg| {
-            let mut issues = 0usize;
-            for entry in &cfg.providers {
-                let schema = match entry.name.as_str() {
-                    "github" => crate::providers::github::GitHubProvider::available_config_schema(),
-                    "gitlab" => crate::providers::gitlab::GitLabProvider::available_config_schema(),
-                    "jira"   => crate::providers::jira::JiraProvider::available_config_schema(),
-                    _        => continue,
-                };
-                let known: std::collections::HashSet<&str> = schema.iter().map(|p| p.name).collect();
-                for key in entry.config.keys() {
-                    if !known.contains(key.as_str()) { issues += 1; }
-                }
-                for param in &schema {
-                    if param.required && !entry.config.contains_key(param.name) { issues += 1; }
-                }
-            }
-            issues
-        })
-        .unwrap_or(0);
-
-    let issue_count = findings.extraneous_dirs.len()
-        + findings.extraneous_module_paths.len()
-        + config_issues;
-
+    let issue_count = detail.config_issues.iter().map(|(_, v)| v.len()).sum::<usize>()
+        + detail.extraneous_dirs.len()
+        + detail.extraneous_module_paths.len();
     if issue_count == 0 {
         (GREEN, "ok".to_string())
     } else {

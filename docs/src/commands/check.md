@@ -68,3 +68,9 @@ The `local` provider has no configuration schema and is not validated.
 
 If you need to keep files that are intentionally outside any module, place them in `misc/` —
 `banco check` will never flag its contents. See [misc](../misc.md).
+
+## Dashboard integration
+
+The same check runs inside the interactive dashboard. The **Status** header shows a green `ok`
+or a red issue count at a glance. Press `d` to open the [check panel](dashboard.md#check-panel),
+a compact overlay that lists the findings without leaving the dashboard.
