@@ -104,12 +104,11 @@ impl Provider for JiraProvider {
             backend
         );
 
-        let since = sync_state::read(root, self.entry.display_name());
         let synced_at = sync_state::now();
 
         println!("  fetching issues from project {} via {}...", project, backend);
 
-        let issues = claude::fetch_issues(&project, &labels, since.as_deref())?;
+        let issues = claude::fetch_issues(&project, &labels, None)?;
         schema::validate(&issues)?;
 
         let task_dir = self.tasks_root(root);

@@ -223,7 +223,6 @@ impl Provider for GitHubProvider {
 
         let sync_issues = self.entry.get_bool("sync_issues", true);
         let template_base = "tasks";
-        let since = sync_state::read(root, self.entry.display_name());
         let synced_at = sync_state::now();
 
         if sync_tasks && sync_issues {
@@ -237,7 +236,7 @@ impl Provider for GitHubProvider {
 
                 let mut existing = scan_col(&task_dir);
                 let mut fetched_numbers: std::collections::HashSet<u64> = std::collections::HashSet::new();
-                for issue in client.issues_open(owner_repo, since.as_deref())? {
+                for issue in client.issues_open(owner_repo, None)? {
                     if issue.pull_request.is_some() {
                         continue;
                     }

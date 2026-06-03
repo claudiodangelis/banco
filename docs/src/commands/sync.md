@@ -21,21 +21,18 @@ Sync is non-destructive: it never deletes or overwrites existing files.
 | `--module <tasks\|repos>` | Limit sync to a single module; skips the other. Useful when you only want to fetch issues without cloning repos, or vice versa. |
 | `--pattern <regex>` | Only sync projects whose path (`owner/repo` for GitHub/GitLab) matches this regex. Applied on top of the project list already defined in the provider config. Not applicable to Jira. |
 
-## Incremental sync
+## Sync state
 
-After each successful sync, banco writes a timestamp to `.banco/sync-state/<provider>`. On the
-next run, only items updated since that timestamp are fetched — making subsequent syncs
-significantly faster on large projects.
-
-The first sync (or any sync where the state file is absent) always fetches everything. The state
-file is only written on success, so a failed sync will retry the full window on the next run.
+After each successful sync, banco writes a timestamp to `.banco/sync-state/<provider>`. This
+records when the last sync completed and is available for informational purposes. The state file
+is only written on success, so a failed sync is retried in full on the next run.
 
 ## Tasks (issues)
 
 Syncing tasks is a two-phase process: **fetch** then **reconcile**.
 
-**Phase 1 — fetch.** Only open/non-done issues are pulled from the remote. The `since` timestamp
-limits the fetch to issues updated since the last sync (first sync fetches everything).
+**Phase 1 — fetch.** Only open/non-done issues are pulled from the remote. The full set of
+currently-open issues is always retrieved.
 
 **Phase 2 — reconcile.** After writing the fetched issues, banco scans every local task file. Any
 task whose ID was *not* in the fetched set and whose local status is not already done/closed is
