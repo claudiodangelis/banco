@@ -229,11 +229,25 @@ fn resolve_item_path(root: &Path, provider_name: &str, module_name: &str, item: 
             Some(dir.join(format!("{}.md", name)))
         }
         (_, "tasks") => {
-            // Remote providers (jira, github, gitlab): tasks/{provider}/{id} - {name}.md
-            let id = item.get("id").and_then(|v| v.as_str())?;
-            let name = item.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let dir = root.join("tasks").join(provider_name);
-            Some(dir.join(format!("{} - {}.md", id, name)))
+            let name = item.get("name").and_then(|v| v.as_str())?;
+            if let (Some(owner), Some(repo)) = (
+                item.get("owner").and_then(|v| v.as_str()),
+                item.get("repo").and_then(|v| v.as_str()),
+            ) {
+                // GitHub: tasks/{provider}/{owner}/{repo}/{stem}.md
+                let dir = root.join("tasks").join(provider_name).join(owner).join(repo);
+                Some(dir.join(format!("{}.md", name)))
+            } else if let Some(project) = item.get("project").and_then(|v| v.as_str()) {
+                // GitLab: tasks/{provider}/{project}/{stem}.md
+                let dir = root.join("tasks").join(provider_name).join(project);
+                Some(dir.join(format!("{}.md", name)))
+            } else if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
+                // JIRA: tasks/{provider}/{id} - {name}.md
+                let dir = root.join("tasks").join(provider_name);
+                Some(dir.join(format!("{} - {}.md", id, name)))
+            } else {
+                None
+            }
         }
         _ => None,
     }
@@ -394,7 +408,7 @@ fn build_list_rows(module: &ModuleContext) -> Vec<ListRow> {
 }
 
 fn show_item_list(stdout: &mut impl Write, root: &Path, provider_name: &str, module: &ModuleContext) -> anyhow::Result<()> {
-    let can_edit = provider_name == "local" && (module.name == "notes" || module.name == "tasks");
+    let can_edit = module.name == "notes" || module.name == "tasks";
     let all_rows = build_list_rows(module);
 
     let mut filter = String::new();
