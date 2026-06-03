@@ -58,9 +58,10 @@ orange.
 | `Tab` | Next module (overflows to first module of next provider) |
 | `Shift+Tab` | Previous module (underflows to last module of previous provider) |
 | `Space` | Browse all items in the focused module |
+| `d` | Open check panel |
 | `Ctrl+S` | Sync |
 | `?` | Toggle shortcuts overlay |
-| `Esc` | Close shortcuts overlay |
+| `Esc` | Close overlay |
 | `q`, `Ctrl+C` | Quit |
 
 Press `?` at any time to show the shortcuts panel as an overlay over the dashboard.
@@ -104,3 +105,38 @@ Editing is supported for all modules that map to files on disk:
 
 - `local` provider: `notes`, `tasks`
 - Remote providers (`jira`, `github`, `gitlab`): `tasks`
+
+## Check panel
+
+Pressing `d` opens a compact overlay summarising the output of [`banco check`](check.md).
+
+```
+         ┌ check ──────────────────────────────┐
+         │                                     │
+         │  2 issues found:                    │
+         │                                     │
+         │  Extraneous directories             │
+         │    ✗  ./archive                     │
+         │                                     │
+         │  Extraneous module paths            │
+         │    ✗  ./notes/local/scratch.txt     │
+         │                                     │
+         │                         Esc  close  │
+         └─────────────────────────────────────┘
+```
+
+When there are no issues the panel shows a single green confirmation line:
+
+```
+         ┌ check ──────────────┐
+         │                     │
+         │  ✓  No issues found │
+         │                     │
+         │           Esc close │
+         └─────────────────────┘
+```
+
+The panel is sized to fit its content and centered on the terminal. It is drawn as an overlay
+on top of the dashboard — the underlying view is not redrawn until the panel is closed.
+
+Press `Esc` or `q` to close.
