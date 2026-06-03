@@ -5,7 +5,7 @@ use std::path::Path;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyModifiers},
-    execute,
+    execute, queue,
     terminal::{self, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use dialoguer::{Input, Select, theme::ColorfulTheme};
@@ -50,7 +50,7 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
 
     macro_rules! redraw {
         ($stdout:expr) => {{
-            execute!($stdout, terminal::Clear(ClearType::All), cursor::MoveTo(0, 0))?;
+            queue!($stdout, terminal::Clear(ClearType::All), cursor::MoveTo(0, 0))?;
             render_main($stdout, root, ctx, focus_p, focus_m, sync_status)?;
             $stdout.flush()?;
         }};
