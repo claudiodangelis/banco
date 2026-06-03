@@ -260,12 +260,22 @@ impl Provider for GitLabProvider {
     }
 
     fn browse_modules(&self, root: &Path) -> anyhow::Result<Vec<(String, Vec<BrowseItem>)>> {
+        let host = self.entry.get_str("host")
+            .unwrap_or_else(|| "https://gitlab.com".to_string());
+        let host = host.trim_end_matches('/');
+
         let mut result = Vec::new();
 
-        // Repos: read git remote origin from each cloned repo; also build a
-        // project_name -> base_url map so task URLs can be derived from it.
+        // Build slug→base_url map from configured projects list (no network call).
+        // Falls back to cloned repo remote URLs for projects matched via projects_pattern.
+        let mut slug_to_url: HashMap<String, String> = HashMap::new();
+        for ns_proj in self.entry.get_list("projects") {
+            let slug = ns_proj.rsplit('/').next().unwrap_or(&ns_proj).to_string();
+            slug_to_url.insert(slug, format!("{}/{}", host, ns_proj));
+        }
+
+        // Repos: read git remote origin; also fills slug_to_url for projects_pattern users.
         let repos_base = self.repos_root(root);
-        let mut repo_url_map: HashMap<String, String> = HashMap::new();
         let mut repo_items: Vec<BrowseItem> = Vec::new();
         if repos_base.exists() {
             let mut entries: Vec<_> = std::fs::read_dir(&repos_base)?
@@ -278,7 +288,7 @@ impl Provider for GitLabProvider {
                     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
                     if let Some(remote_url) = read_git_remote_url(&path) {
                         let base = normalize_git_url(&remote_url);
-                        repo_url_map.insert(name.clone(), base.clone());
+                        slug_to_url.entry(name.clone()).or_insert_with(|| base.clone());
                         repo_items.push(BrowseItem {
                             display: name,
                             pages: vec![
@@ -296,8 +306,7 @@ impl Provider for GitLabProvider {
         }
 
         // Tasks: derive issue URL from tasks/{provider}/{project}/{n} - {title}.md.
-        // Namespace is resolved via the cloned repo's remote URL; skip items where
-        // no matching repo is found (namespace would be unknown).
+        // slug_to_url resolves the project slug to its full base URL.
         let tasks_base = self.tasks_root(root);
         let mut task_items: Vec<BrowseItem> = Vec::new();
         if tasks_base.exists() {
@@ -318,7 +327,7 @@ impl Provider for GitLabProvider {
                         let mut split = stem.splitn(2, " - ");
                         if let (Some(num_str), Some(title)) = (split.next(), split.next()) {
                             if let Ok(num) = num_str.trim().parse::<u64>() {
-                                if let Some(base_url) = repo_url_map.get(project) {
+                                if let Some(base_url) = slug_to_url.get(project) {
                                     let display = format!("{} #{} {}", project, num, title);
                                     let url = format!("{}/-/issues/{}", base_url, num);
                                     task_items.push(BrowseItem::default_page(display, url));
