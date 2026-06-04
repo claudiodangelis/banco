@@ -75,7 +75,7 @@ diffs and never leaks between users.
 | `Space` | Browse all items in the focused module |
 | `v` | Collapse / expand the focused provider |
 | `d` | Open check panel |
-| `Ctrl+S` | Sync |
+| `Ctrl+S` | Sync, then reload the dashboard with the freshly synced items |
 | `?` | Toggle shortcuts overlay |
 | `Esc` | Close overlay |
 | `q`, `Ctrl+C` | Quit |
