@@ -50,6 +50,21 @@ column), the columns collapse to headers-only — counts remain visible.
 The focused provider's box is drawn in orange. The focused module's column header is also
 orange.
 
+#### Collapsing providers
+
+Press `v` to collapse the focused provider. A collapsed provider is replaced by a single
+summary bar showing its name and per-module item counts, freeing the vertical space for the
+expanded providers. Press `v` again on it to expand it back.
+
+```
+│ ▸ github  tasks (4) · repos (2)                          │
+```
+
+This is a per-project view preference: it is remembered per project and persists across
+restarts. It is stored outside the repository in `$XDG_STATE_HOME/banco/state.yml` (falling
+back to `~/.local/state/banco/state.yml`), not in `.banco/config.yml`, so it never appears in
+diffs and never leaks between users.
+
 ## Keyboard shortcuts
 
 | Key | Action |
@@ -58,6 +73,7 @@ orange.
 | `Tab` | Next module (overflows to first module of next provider) |
 | `Shift+Tab` | Previous module (underflows to last module of previous provider) |
 | `Space` | Browse all items in the focused module |
+| `v` | Collapse / expand the focused provider |
 | `d` | Open check panel |
 | `Ctrl+S` | Sync |
 | `?` | Toggle shortcuts overlay |
