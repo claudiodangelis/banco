@@ -629,14 +629,53 @@ fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_
 
     let (term_width, term_height) = terminal::size().unwrap_or((80, 24));
 
+    // Collect visible providers up front so the vertical budget can be split
+    // across them. Each section costs 2 border rows + 1 blank separator row on
+    // top of its content rows; the header above (3 rows) and the bottom status
+    // bar (1 row) must always remain on screen.
+    let sections: Vec<(&ProviderContext, Vec<&ModuleContext>)> = ctx.providers.iter()
+        .map(|p| (p, p.modules.iter().filter(|m| !m.items.is_empty()).collect::<Vec<_>>()))
+        .filter(|(_, v)| !v.is_empty())
+        .collect();
+
+    const HEADER_ROWS: usize = 3; // two header lines + one blank
+    const STATUS_ROWS: usize = 1; // bottom status bar
+    const SECTION_CHROME: usize = 3; // top border + bottom border + separator
+    let mut avail = (term_height as usize)
+        .saturating_sub(HEADER_ROWS + STATUS_ROWS)
+        .saturating_sub(sections.len() * SECTION_CHROME);
+
+    // Each section's natural height is its tallest column. Distribute the
+    // available content rows by water-filling: sections that need fewer rows
+    // than their fair share take only what they need and donate the rest to
+    // the remaining sections, so a small panel never starves a large one.
+    let natural: Vec<usize> = sections.iter()
+        .map(|(_, mods)| mods.iter().map(|m| module_column_lines(m).len()).max().unwrap_or(0))
+        .collect();
+    let mut budgets = vec![0usize; sections.len()];
+    let mut remaining: Vec<usize> = (0..sections.len()).collect();
+    while !remaining.is_empty() && avail > 0 {
+        let share = (avail / remaining.len()).max(1);
+        let mut next = Vec::new();
+        let mut progressed = false;
+        for &i in &remaining {
+            let want = natural[i].saturating_sub(budgets[i]);
+            let give = want.min(share).min(avail);
+            budgets[i] += give;
+            avail -= give;
+            if give > 0 { progressed = true; }
+            if budgets[i] < natural[i] { next.push(i); }
+        }
+        // No section could grow this pass (avail < remaining count): stop.
+        if !progressed { break; }
+        remaining = next;
+    }
+
     let mut vp_idx = 0usize;
-    for provider in &ctx.providers {
-        let visible: Vec<&ModuleContext> = provider.modules.iter()
-            .filter(|m| !m.items.is_empty())
-            .collect();
-        if visible.is_empty() { continue; }
+    for (i, (provider, visible)) in sections.iter().enumerate() {
         let focused_col = if vp_idx == focus_p { Some(focus_m) } else { None };
-        render_provider_section(stdout, provider, &visible, term_width as usize, focused_col)?;
+        let budget = budgets[i].max(1); // always room for at least the header
+        render_provider_section(stdout, provider, visible, term_width as usize, budget, focused_col)?;
         write!(stdout, "\r\n")?;
         vp_idx += 1;
     }
@@ -891,10 +930,12 @@ fn enabled_providers(root: &Path) -> String {
 
 // ── provider section rendering ───────────────────────────────────────────────
 
+#[derive(Clone)]
 enum ColumnLine {
     Header(String),
     Group(String),
     Item(String),
+    More(String),
 }
 
 fn display_name(raw: &str) -> &str {
@@ -927,8 +968,7 @@ fn module_column_lines(module: &ModuleContext) -> Vec<ColumnLine> {
                 .collect();
             projects.sort();
 
-            let mut item_budget = 5usize;
-            'projects: for project in &projects {
+            for project in &projects {
                 let project_items: Vec<_> = module.items.iter()
                     .filter(|i| item_project_key(i).as_deref() == Some(project.as_str()))
                     .collect();
@@ -944,13 +984,11 @@ fn module_column_lines(module: &ModuleContext) -> Vec<ColumnLine> {
                         .filter(|i| i.get("status").and_then(|v| v.as_str()) == Some(status.as_str()))
                         .collect();
                     lines.push(ColumnLine::Group(format!("    {} ({})", status, status_items.len())));
-                    for item in status_items.iter().take(item_budget) {
+                    for item in &status_items {
                         if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
                             let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
                             let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
                             lines.push(ColumnLine::Item(format!("      {}{}", prefix, display_name(name))));
-                            item_budget = item_budget.saturating_sub(1);
-                            if item_budget == 0 { break 'projects; }
                         }
                     }
                 }
@@ -968,7 +1006,7 @@ fn module_column_lines(module: &ModuleContext) -> Vec<ColumnLine> {
                     .filter(|i| i.get("status").and_then(|v| v.as_str()) == Some(status.as_str()))
                     .collect();
                 lines.push(ColumnLine::Group(format!("  {} ({})", status, items.len())));
-                for item in items.iter().take(5) {
+                for item in &items {
                     if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
                         let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
                         let prefix = if id.is_empty() { String::new() } else { format!("{} ", id) };
@@ -978,7 +1016,7 @@ fn module_column_lines(module: &ModuleContext) -> Vec<ColumnLine> {
             }
         }
     } else {
-        for item in module.items.iter().take(5) {
+        for item in &module.items {
             if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
                 lines.push(ColumnLine::Item(format!("  {name}")));
             }
@@ -988,11 +1026,43 @@ fn module_column_lines(module: &ModuleContext) -> Vec<ColumnLine> {
     lines
 }
 
+/// Cap a single column's content to `max_rows` lines. When the column would
+/// overflow, the surplus item lines are dropped and replaced with a single
+/// `+N more <noun>` summary line so the count stays visible. The header line
+/// is always preserved. `noun` is the plural item label (e.g. "tasks").
+fn truncate_column(lines: Vec<ColumnLine>, max_rows: usize, noun: &str) -> Vec<ColumnLine> {
+    if lines.len() <= max_rows {
+        return lines;
+    }
+    let item_total = lines.iter().filter(|l| matches!(l, ColumnLine::Item(_))).count();
+
+    // The header (first line) is always kept; the last visible row is reserved
+    // for the "+N more" summary. Whatever rows remain in between hold content.
+    let header = lines.first().cloned();
+    let body_budget = max_rows.saturating_sub(if header.is_some() { 2 } else { 1 });
+
+    let mut out: Vec<ColumnLine> = Vec::with_capacity(max_rows);
+    let mut items_shown = 0usize;
+    if let Some(h) = header {
+        out.push(h);
+    }
+    for line in lines.into_iter().skip(1).take(body_budget) {
+        if matches!(line, ColumnLine::Item(_)) {
+            items_shown += 1;
+        }
+        out.push(line);
+    }
+    let hidden = item_total.saturating_sub(items_shown);
+    out.push(ColumnLine::More(format!("  +{hidden} more {noun}")));
+    out
+}
+
 fn render_provider_section(
     stdout: &mut impl Write,
     provider: &ProviderContext,
     modules: &[&ModuleContext],
     term_width: usize,
+    content_budget: usize,
     focused_col: Option<usize>,
 ) -> anyhow::Result<()> {
     let n = modules.len();
@@ -1012,6 +1082,14 @@ fn render_provider_section(
             .map(|col| col.into_iter().filter(|l| matches!(l, ColumnLine::Header(_))).collect())
             .collect();
     }
+
+    // Cap each column to the vertical budget so the header and status bar stay
+    // on screen. Overflow collapses into a "+N more <noun>" summary line.
+    columns = columns
+        .iter()
+        .zip(modules.iter())
+        .map(|(col, m)| truncate_column(col.clone(), content_budget.max(1), &m.name))
+        .collect();
 
     let inner_total = term_width.saturating_sub(n + 1);
     let base_col = inner_total / n;
@@ -1058,6 +1136,7 @@ fn render_provider_section(
                 }
                 Some(ColumnLine::Group(s)) => (WHITE, s.clone()),
                 Some(ColumnLine::Item(s)) => (GRAY, s.clone()),
+                Some(ColumnLine::More(s)) => (GRAY, s.clone()),
             };
             write!(stdout, "{color}{}{RESET}{border}│{RESET}", fit(&text, w))?;
         }
