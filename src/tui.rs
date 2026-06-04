@@ -71,7 +71,7 @@ pub fn dashboard(root: &Path, ctx: ContextOutput) -> anyhow::Result<()> {
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
 
-    let result = render_and_wait(&mut stdout, root, &ctx);
+    let result = render_and_wait(&mut stdout, root, ctx);
 
     let _ = execute!(stdout, cursor::Show, LeaveAlternateScreen);
     let _ = terminal::disable_raw_mode();
@@ -79,21 +79,23 @@ pub fn dashboard(root: &Path, ctx: ContextOutput) -> anyhow::Result<()> {
     result
 }
 
-fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) -> anyhow::Result<()> {
-    // Count visible modules per visible provider for navigation.
+// Navigation indices derived from the context. Recomputed whenever the
+// underlying data changes (e.g. after a sync).
+struct NavIndex {
+    // Count of visible modules per visible provider.
+    visible_mods: Vec<usize>,
+    total_vp: usize,
+    // Flat index: visible_provider_idx -> (provider_idx, [visible_module_idxs]).
+    vp_map: Vec<(usize, Vec<usize>)>,
+}
+
+fn build_nav_index(ctx: &ContextOutput) -> NavIndex {
     let visible_mods: Vec<usize> = ctx.providers.iter()
         .map(|p| p.modules.iter().filter(|m| !m.items.is_empty()).count())
         .filter(|&c| c > 0)
         .collect();
     let total_vp = visible_mods.len();
 
-    let mut focus_p: usize = 0;
-    let mut focus_m: usize = 0;
-    let mut show_help = false;
-    let mut view = crate::state::load(root);
-    let mut sync_status: Option<(&'static str, &'static str)> = None; // (color, msg)
-
-    // Build a flat index: (visible_provider_idx) -> (provider_idx, [visible_module_idxs])
     let vp_map: Vec<(usize, Vec<usize>)> = ctx.providers.iter()
         .enumerate()
         .filter_map(|(pi, p)| {
@@ -106,10 +108,22 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
         })
         .collect();
 
+    NavIndex { visible_mods, total_vp, vp_map }
+}
+
+fn render_and_wait(stdout: &mut impl Write, root: &Path, mut ctx: ContextOutput) -> anyhow::Result<()> {
+    let NavIndex { mut visible_mods, mut total_vp, mut vp_map } = build_nav_index(&ctx);
+
+    let mut focus_p: usize = 0;
+    let mut focus_m: usize = 0;
+    let mut show_help = false;
+    let mut view = crate::state::load(root);
+    let mut sync_status: Option<(&'static str, &'static str)> = None; // (color, msg)
+
     macro_rules! redraw {
         ($stdout:expr) => {{
             queue!($stdout, terminal::Clear(ClearType::All), cursor::MoveTo(0, 0))?;
-            render_main($stdout, root, ctx, focus_p, focus_m, &view, sync_status)?;
+            render_main($stdout, root, &ctx, focus_p, focus_m, &view, sync_status)?;
             $stdout.flush()?;
         }};
     }
@@ -188,6 +202,21 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
                             .map(|s| s.success())
                             .unwrap_or(false);
                         sync_status = Some(if ok { (GREEN, "sync ok") } else { (RED, "sync failed") });
+                        // Sync mutates files on disk; rebuild the context and
+                        // navigation indices so the dashboard reflects the new items.
+                        if ok {
+                            if let Ok(fresh) = crate::build_context(root) {
+                                ctx = fresh;
+                                let nav = build_nav_index(&ctx);
+                                visible_mods = nav.visible_mods;
+                                total_vp = nav.total_vp;
+                                vp_map = nav.vp_map;
+                                // Keep focus within the (possibly changed) bounds.
+                                focus_p = focus_p.min(total_vp.saturating_sub(1));
+                                let mods_here = visible_mods.get(focus_p).copied().unwrap_or(0);
+                                focus_m = focus_m.min(mods_here.saturating_sub(1));
+                            }
+                        }
                         redraw!(stdout);
                     }
 

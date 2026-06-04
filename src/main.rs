@@ -244,6 +244,22 @@ fn provider_list(root: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub(crate) fn build_context(root: &Path) -> anyhow::Result<ContextOutput> {
+    let local = LocalProvider::new();
+    let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+    let mut providers = vec![ProviderContext {
+        name: local.name().to_string(),
+        modules: local.context(root)?,
+    }];
+    for p in remote_providers(root)? {
+        providers.push(ProviderContext {
+            name: p.name().to_string(),
+            modules: p.context(root)?,
+        });
+    }
+    Ok(ContextOutput { project, providers })
+}
+
 fn remote_providers(root: &Path) -> anyhow::Result<Vec<Box<dyn Provider>>> {
     let project_config = config::load(root)?;
     let mut providers: Vec<Box<dyn Provider>> = Vec::new();
@@ -267,18 +283,7 @@ fn run() -> anyhow::Result<()> {
     let local = LocalProvider::new();
 
     let Some(command) = cli.command else {
-        let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-        let mut providers = vec![ProviderContext {
-            name: local.name().to_string(),
-            modules: local.context(&root)?,
-        }];
-        for p in remote_providers(&root)? {
-            providers.push(ProviderContext {
-                name: p.name().to_string(),
-                modules: p.context(&root)?,
-            });
-        }
-        return tui::dashboard(&root, ContextOutput { project, providers });
+        return tui::dashboard(&root, build_context(&root)?);
     };
 
     match command {
@@ -363,18 +368,7 @@ fn run() -> anyhow::Result<()> {
                 .with_context(|| format!("failed to launch editor '{}'", editor))?;
         }
         Commands::Context { pretty } => {
-            let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-            let mut providers = vec![ProviderContext {
-                name: local.name().to_string(),
-                modules: local.context(&root)?,
-            }];
-            for p in remote_providers(&root)? {
-                providers.push(ProviderContext {
-                    name: p.name().to_string(),
-                    modules: p.context(&root)?,
-                });
-            }
-            let output = ContextOutput { project, providers };
+            let output = build_context(&root)?;
             let json = if pretty {
                 serde_json::to_string_pretty(&output)?
             } else {
