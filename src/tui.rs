@@ -90,6 +90,7 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
     let mut focus_p: usize = 0;
     let mut focus_m: usize = 0;
     let mut show_help = false;
+    let mut view = crate::state::load(root);
     let mut sync_status: Option<(&'static str, &'static str)> = None; // (color, msg)
 
     // Build a flat index: (visible_provider_idx) -> (provider_idx, [visible_module_idxs])
@@ -108,7 +109,7 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
     macro_rules! redraw {
         ($stdout:expr) => {{
             queue!($stdout, terminal::Clear(ClearType::All), cursor::MoveTo(0, 0))?;
-            render_main($stdout, root, ctx, focus_p, focus_m, sync_status)?;
+            render_main($stdout, root, ctx, focus_p, focus_m, &view, sync_status)?;
             $stdout.flush()?;
         }};
     }
@@ -164,6 +165,13 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput) ->
 
                     (KeyCode::Char('d'), KeyModifiers::NONE) if !show_help => {
                         show_check_panel(stdout, root)?;
+                        redraw!(stdout);
+                    }
+
+                    (KeyCode::Char('v'), KeyModifiers::NONE) if !show_help && total_vp > 0 => {
+                        let (pi, _) = vp_map[focus_p];
+                        view.toggle_collapsed(&ctx.providers[pi].name);
+                        crate::state::save(root, &view);
                         redraw!(stdout);
                     }
 
@@ -610,7 +618,7 @@ fn render_item_list(
 
 // ── main dashboard rendering ─────────────────────────────────────────────────
 
-fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_p: usize, focus_m: usize, sync_status: Option<(&str, &str)>) -> anyhow::Result<()> {
+fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_p: usize, focus_m: usize, view: &crate::state::ProjectState, sync_status: Option<(&str, &str)>) -> anyhow::Result<()> {
     let project_name = root.file_name().and_then(|s| s.to_str()).unwrap_or("?");
 
     let sync = last_sync(root);
@@ -632,28 +640,37 @@ fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_
     // Collect visible providers up front so the vertical budget can be split
     // across them. Each section costs 2 border rows + 1 blank separator row on
     // top of its content rows; the header above (3 rows) and the bottom status
-    // bar (1 row) must always remain on screen.
+    // bar (1 row) must always remain on screen. A provider collapsed with `v`
+    // renders as a single summary bar instead and is excluded from the budget.
     let sections: Vec<(&ProviderContext, Vec<&ModuleContext>)> = ctx.providers.iter()
         .map(|p| (p, p.modules.iter().filter(|m| !m.items.is_empty()).collect::<Vec<_>>()))
         .filter(|(_, v)| !v.is_empty())
         .collect();
+    let collapsed: Vec<bool> = sections.iter().map(|(p, _)| view.is_collapsed(&p.name)).collect();
 
     const HEADER_ROWS: usize = 3; // two header lines + one blank
     const STATUS_ROWS: usize = 1; // bottom status bar
     const SECTION_CHROME: usize = 3; // top border + bottom border + separator
+    const COLLAPSED_ROWS: usize = 2; // summary bar + separator
+    let collapsed_cost: usize = collapsed.iter().filter(|&&c| c).count() * COLLAPSED_ROWS;
+    let expanded_count = collapsed.iter().filter(|&&c| !c).count();
     let mut avail = (term_height as usize)
         .saturating_sub(HEADER_ROWS + STATUS_ROWS)
-        .saturating_sub(sections.len() * SECTION_CHROME);
+        .saturating_sub(collapsed_cost)
+        .saturating_sub(expanded_count * SECTION_CHROME);
 
-    // Each section's natural height is its tallest column. Distribute the
+    // Each expanded section's natural height is its tallest column. Distribute the
     // available content rows by water-filling: sections that need fewer rows
     // than their fair share take only what they need and donate the rest to
     // the remaining sections, so a small panel never starves a large one.
-    let natural: Vec<usize> = sections.iter()
-        .map(|(_, mods)| mods.iter().map(|m| module_column_lines(m).len()).max().unwrap_or(0))
+    // Collapsed sections need no content rows.
+    let natural: Vec<usize> = sections.iter().enumerate()
+        .map(|(i, (_, mods))| {
+            if collapsed[i] { 0 } else { mods.iter().map(|m| module_column_lines(m).len()).max().unwrap_or(0) }
+        })
         .collect();
     let mut budgets = vec![0usize; sections.len()];
-    let mut remaining: Vec<usize> = (0..sections.len()).collect();
+    let mut remaining: Vec<usize> = (0..sections.len()).filter(|&i| !collapsed[i]).collect();
     while !remaining.is_empty() && avail > 0 {
         let share = (avail / remaining.len()).max(1);
         let mut next = Vec::new();
@@ -673,9 +690,14 @@ fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_
 
     let mut vp_idx = 0usize;
     for (i, (provider, visible)) in sections.iter().enumerate() {
-        let focused_col = if vp_idx == focus_p { Some(focus_m) } else { None };
-        let budget = budgets[i].max(1); // always room for at least the header
-        render_provider_section(stdout, provider, visible, term_width as usize, budget, focused_col)?;
+        let focused = vp_idx == focus_p;
+        if collapsed[i] {
+            render_collapsed_section(stdout, provider, visible, term_width as usize, focused)?;
+        } else {
+            let focused_col = if focused { Some(focus_m) } else { None };
+            let budget = budgets[i].max(1); // always room for at least the header
+            render_provider_section(stdout, provider, visible, term_width as usize, budget, focused_col)?;
+        }
         write!(stdout, "\r\n")?;
         vp_idx += 1;
     }
@@ -701,6 +723,7 @@ fn render_help_overlay(stdout: &mut impl Write) -> anyhow::Result<()> {
         ("Tab",        "next module"),
         ("Shift+Tab",  "prev module"),
         ("Space",      "browse module items"),
+        ("v",          "collapse / expand provider"),
         ("d",          "check panel"),
         ("Ctrl+S",     "sync"),
         ("q",          "quit"),
@@ -1055,6 +1078,34 @@ fn truncate_column(lines: Vec<ColumnLine>, max_rows: usize, noun: &str) -> Vec<C
     let hidden = item_total.saturating_sub(items_shown);
     out.push(ColumnLine::More(format!("  +{hidden} more {noun}")));
     out
+}
+
+/// A provider collapsed with `v`: a single bordered bar showing the provider
+/// name and a per-module item-count summary, e.g. `▸ github  tasks (4) · repos (2)`.
+fn render_collapsed_section(
+    stdout: &mut impl Write,
+    provider: &ProviderContext,
+    modules: &[&ModuleContext],
+    term_width: usize,
+    focused: bool,
+) -> anyhow::Result<()> {
+    let border = if focused { ORANGE } else { GRAY };
+    let name_color = if focused { ORANGE } else { WHITE };
+
+    let summary = modules.iter()
+        .map(|m| format!("{} ({})", m.name, m.items.len()))
+        .collect::<Vec<_>>()
+        .join(" · ");
+
+    let inner = term_width.saturating_sub(2); // borders
+    // "▸ " + name + "  " + summary, then padded/truncated to the inner width.
+    let label = format!("▸ {}  ", provider.name);
+    let label_len = label.chars().count();
+    let summary_room = inner.saturating_sub(label_len);
+    let body = format!("{name_color}{label}{GRAY}{}{RESET}", fit(&summary, summary_room));
+
+    write!(stdout, "{border}│{RESET}{body}{border}│{RESET}\r\n")?;
+    Ok(())
 }
 
 fn render_provider_section(

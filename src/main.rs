@@ -4,6 +4,7 @@ mod context;
 mod module;
 mod provider;
 mod providers;
+mod state;
 mod sync_state;
 mod template;
 mod tui;
