@@ -12,7 +12,7 @@ Press `q` or `Ctrl+C` to exit.
 ## Layout
 
 ```
-━━━━━━━━━━━━━    Status:     2026-01-15 09:30:00 (3d ago)  ·  ok
+━━━━━━━━━━━━━    Status:     2026-01-15 09:30:00 (3d ago)  ·  ok  ·  1.2 MB
  ┃  banco  ┃    Providers:  local, github
 ━━━━━━━━━━━━━
 
@@ -32,7 +32,7 @@ The top row shows:
 
 | Field | Source |
 |---|---|
-| **Status** | Most recent sync timestamp with relative age, and config check result |
+| **Status** | Most recent sync timestamp with relative age, config check result, and total project folder size |
 | **Providers** | Enabled providers from `.banco/config.yml`, always starting with `local` |
 
 ### Provider sections

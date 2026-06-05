@@ -653,7 +653,8 @@ fn render_main(stdout: &mut impl Write, root: &Path, ctx: &ContextOutput, focus_
     let sync = last_sync(root);
     let providers_str = enabled_providers(root);
     let (check_color, check_str) = check_status(root);
-    let status_val = format!("{GRAY}{sync}  ·  {check_color}{check_str}{RESET}");
+    let size_str = format_size(folder_size(root));
+    let status_val = format!("{GRAY}{sync}  ·  {check_color}{check_str}{GRAY}  ·  {size_str}{RESET}");
 
     // "  banco: " (9) + project_name + "  " (2) = inner display width
     let inner = 11 + project_name.chars().count();
@@ -965,6 +966,34 @@ fn check_status(root: &Path) -> (&'static str, String) {
         (GREEN, "ok".to_string())
     } else {
         (RED, format!("{issue_count} issue{}", if issue_count == 1 { "" } else { "s" }))
+    }
+}
+
+fn folder_size(root: &Path) -> u64 {
+    walkdir::WalkDir::new(root)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter_map(|e| e.metadata().ok())
+        .filter(|m| m.is_file())
+        .map(|m| m.len())
+        .sum()
+}
+
+fn format_size(bytes: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+    let mut size = bytes as f64;
+    let mut unit = 0;
+    while size >= 1024.0 && unit < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{bytes} {}", UNITS[0])
+    } else {
+        // Trim trailing zeros, max 2 decimals
+        let s = format!("{size:.2}");
+        let s = s.trim_end_matches('0').trim_end_matches('.');
+        format!("{s} {}", UNITS[unit])
     }
 }
 
