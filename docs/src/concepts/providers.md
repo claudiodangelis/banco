@@ -7,7 +7,8 @@ for creating, reading, and (for remote providers) synchronizing items with an ex
 
 Provider configuration is stored in `.banco/config.yml` within the project directory. The local
 provider is added automatically on `banco init`; additional providers are added interactively via
-`banco provider add`.
+`banco provider add` or the [dashboard](../commands/dashboard.md) config editor (press `c`), which
+can also edit and remove existing providers.
 
 Each provider entry supports a common `enabled` field (default: `true`) — set it to `false` to
 disable a provider without removing its configuration.

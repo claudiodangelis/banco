@@ -61,6 +61,11 @@ impl LocalProvider {
         self.enabled_modules().find(|m| m.cli_name() == cli_name).map(|m| m.as_ref())
     }
 
+    /// CLI names of the currently-enabled modules, for help/error text.
+    pub fn enabled_cli_names(&self) -> Vec<String> {
+        self.enabled_modules().map(|m| m.cli_name().to_string()).collect()
+    }
+
     pub fn all_template_paths(&self, root: &Path) -> Vec<String> {
         self.enabled_modules().flat_map(|m| m.template_paths(root)).collect()
     }

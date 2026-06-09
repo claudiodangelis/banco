@@ -27,7 +27,7 @@ your review.
 
 ## Output
 
-A JSON object with three arrays: `repos`, `tasks`, and `local`.
+A JSON object with four arrays: `repos`, `tasks`, `local`, and `modules`.
 
 ### repos
 
@@ -83,7 +83,9 @@ Each task directory whose issues are no longer synced, with file counts split by
 `disabled_modules`), `removed_from_config`, `provider_disabled`, or `provider_removed`.
 Per-project detection (`removed_from_config`) applies to GitHub projects and to GitLab projects
 configured via an explicit `projects` list. The `module_disabled` reason applies to both the
-`tasks` and `repos` modules.
+`tasks` and `repos` modules, and to the **local** provider as well — turning `repos` or `tasks`
+off for `local` (or disabling the whole `local` provider) flags `repos/local` and `tasks/local`
+just as it does for a remote provider. Local repo findings carry the same `git` safety summary.
 
 ### local
 
@@ -99,6 +101,27 @@ whether it holds content worth keeping.
   "modified": "2026-05-14"
 }
 ```
+
+### modules
+
+Each whole module directory (`repos/`, `tasks/`, `notes/`, `bookmarks/`) that **no enabled
+provider backs anymore** — the module is off for the local provider and no remote provider
+implements it with the module enabled. This is the headline that an entire top-level directory
+is now stale; the per-subtree entries in `repos`/`tasks` still detail what's inside it.
+
+```json
+{
+  "module": "repos",
+  "path": "repos",
+  "reason": "no_provider_backs_module",
+  "entries": 3
+}
+```
+
+`entries` is the number of immediate entries under the directory (provider subdirs, label dirs,
+or files) — a quick measure of how much is there. As with everything else `tidy` reports,
+removing the directory is your decision; review the `repos`/`tasks` findings (and their git
+safety summaries) before deleting a whole tree.
 
 ## Removal is yours
 

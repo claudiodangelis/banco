@@ -75,6 +75,7 @@ diffs and never leaks between users.
 | `Space` | Browse all items in the focused module |
 | `v` | Collapse / expand the focused provider |
 | `d` | Open check panel |
+| `c` | Open the config editor |
 | `Ctrl+S` | Sync, then reload the dashboard with the freshly synced items |
 | `?` | Toggle shortcuts overlay |
 | `Esc` | Close overlay |
@@ -156,3 +157,80 @@ The panel is sized to fit its content and centered on the terminal. It is drawn 
 on top of the dashboard — the underlying view is not redrawn until the panel is closed.
 
 Press `Esc` or `q` to close.
+
+## Config editor
+
+Pressing `c` opens an editor for `.banco/config.yml` as a master-detail view. The master list
+holds a **General** row (project-wide settings) followed by one row per configured provider.
+Providers that are disabled show `✗ off`, and providers with validation problems show a `⚠`
+issue count in red.
+
+```
+         ┌ config ───────────────────────────────────┐
+         │                                           │
+         │  General                                  │
+         │  local                                    │
+         │  github (gh-work)                         │
+         │  gitlab                       ✗ off       │
+         │  jira                         ⚠ 1         │
+         │                                           │
+         │  ↑↓ move  Enter open  a add  x delete  …  │
+         └───────────────────────────────────────────┘
+```
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` | Move between rows |
+| `Enter` | Open the selected row's detail view |
+| `a` | Add a provider (runs the same interactive flow as [`banco provider add`](provider.md)) |
+| `x` / `Del` | Remove the selected provider from the config (after confirmation) |
+| `Esc` / `q` | Close the editor |
+
+Removing a provider only deletes its entry from `.banco/config.yml` — synced files already on
+disk are left in place. Use [`banco tidy`](tidy.md) afterwards to review what is now orphaned.
+
+The built-in `local` provider cannot be removed, because an absent `local` entry means "use the
+defaults" (every module enabled) — deleting it would reset its configuration rather than turn it
+off. To switch local off instead, open its detail view and toggle `enabled`, or disable
+individual modules; both are saved to the config.
+
+### Detail views
+
+Opening **General** edits the project-wide `browse` block (the command and arguments used to
+open URLs). Opening a provider shows a schema-driven form:
+
+```
+         ┌ github (gh-work) ─────────────────────────┐
+         │                                           │
+         │  alias        gh-work                     │
+         │  enabled      [x]                         │
+         │  module tasks [x]                         │
+         │  module repos [x]                         │
+         │  api_key      $GH_TOKEN                    │
+         │  host         (unset)                     │
+         │  projects     [2 items]                   │
+         │  browse cmd   (none)                       │
+         │                                           │
+         │  ⚠ 0 issues                               │
+         └───────────────────────────────────────────┘
+```
+
+Each field is edited in place with `Enter`:
+
+- **alias**, **string parameters**, **browse cmd** — open a single-line text editor. Clearing
+  the value unsets it (string parameters are removed from the config entirely).
+- **enabled** and **module** rows — toggle on/off. Toggling a module off adds it to the
+  provider's `disabled_modules`.
+- **list parameters** (e.g. `projects`) and **browse args** — open a list editor where `a`
+  adds an entry and `d` removes the selected one.
+
+Required parameters that are unset are shown in red, and a live issue count at the bottom
+mirrors [`banco check`](check.md). Stored values are shown raw — a `$GH_TOKEN` reference is
+displayed as `$GH_TOKEN`, not its expanded value.
+
+Every change is saved to `.banco/config.yml` immediately. When you close the editor, the
+dashboard rebuilds so any newly enabled or disabled providers and modules are reflected at
+once.
+
+> **Note:** saving rewrites `config.yml` through the YAML serializer, so hand-written comments
+> and key ordering are not preserved. Edit the file directly if you need to keep those.

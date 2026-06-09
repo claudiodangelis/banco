@@ -155,7 +155,7 @@ fn check_config(root: &Path) -> anyhow::Result<Vec<String>> {
 
 const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab", "jira"];
 
-fn provider_add(root: &Path) -> anyhow::Result<()> {
+pub(crate) fn provider_add(root: &Path) -> anyhow::Result<()> {
     let theme = ColorfulTheme::default();
 
     let idx = dialoguer::Select::with_theme(&theme)
@@ -277,24 +277,39 @@ fn provider_list(root: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Build the local provider honoring its `disabled_modules` config, falling
-/// back to all modules enabled when there's no config or no local entry.
+/// Build the local provider honoring its config, falling back to all modules
+/// enabled when there's no config or no local entry. A local entry with
+/// `enabled: false` is treated as "every module disabled" — the modules still
+/// own their directories (so `check` won't flag them) but are skipped for
+/// init/context/browse and refused by `find_module`, just like remote providers
+/// honor the `enabled` flag.
 fn local_provider(root: &Path) -> LocalProvider {
-    let disabled = config::load(root)
+    let entry = config::load(root)
         .ok()
-        .and_then(|c| c.providers.into_iter().find(|e| e.name == "local"))
-        .map(|e| e.disabled_modules)
-        .unwrap_or_default();
+        .and_then(|c| c.providers.into_iter().find(|e| e.name == "local"));
+    let disabled = match entry {
+        Some(e) if !e.enabled => {
+            LocalProvider::available_modules().iter().map(|m| m.to_string()).collect()
+        }
+        Some(e) => e.disabled_modules,
+        None => Vec::new(),
+    };
     LocalProvider::with_disabled(disabled)
 }
 
 pub(crate) fn build_context(root: &Path) -> anyhow::Result<ContextOutput> {
     let local = local_provider(root);
     let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-    let mut providers = vec![ProviderContext {
-        name: local.name().to_string(),
-        modules: local.context(root)?,
-    }];
+    let mut providers = Vec::new();
+    // A fully-disabled local provider produces no modules; omit it entirely so
+    // it's treated like any other disabled provider rather than an empty shell.
+    let local_modules = local.context(root)?;
+    if !local_modules.is_empty() {
+        providers.push(ProviderContext {
+            name: local.name().to_string(),
+            modules: local_modules,
+        });
+    }
     for p in remote_providers(root)? {
         providers.push(ProviderContext {
             name: p.name().to_string(),
@@ -363,9 +378,14 @@ fn run() -> anyhow::Result<()> {
             }
         }
         Commands::New { module, name, labels } => {
-            let m = local
-                .find_module(&module)
-                .ok_or_else(|| anyhow::anyhow!("unknown module '{}'; available: note, task", module))?;
+            let m = local.find_module(&module).ok_or_else(|| {
+                let available = local.enabled_cli_names();
+                if available.is_empty() {
+                    anyhow::anyhow!("no modules are enabled for the local provider")
+                } else {
+                    anyhow::anyhow!("unknown module '{}'; available: {}", module, available.join(", "))
+                }
+            })?;
 
             let tui_mode = name.is_none() && labels.is_empty();
             let (item_name, item_params) = if tui_mode {

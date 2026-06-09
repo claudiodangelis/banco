@@ -22,6 +22,24 @@ pub struct TidyReport {
     pub repos: Vec<RepoFinding>,
     pub tasks: Vec<TaskFinding>,
     pub local: Vec<LocalFinding>,
+    /// Whole module directories (`repos/`, `tasks/`, …) no enabled provider
+    /// backs anymore — see [`ModuleFinding`].
+    pub modules: Vec<ModuleFinding>,
+}
+
+/// A whole module directory (e.g. `repos/`) that no enabled provider backs: the
+/// module is off for the local provider and no remote provider implements it
+/// with the module enabled. The per-subtree findings in `repos`/`tasks` still
+/// detail what's inside; this is the headline that the whole tree is stale.
+#[derive(Serialize)]
+pub struct ModuleFinding {
+    pub module: String,
+    /// Path relative to the project root (the module dir itself, e.g. `repos`).
+    pub path: String,
+    pub reason: &'static str,
+    /// Immediate entries under the module dir (provider subdirs, label dirs, or
+    /// files) — a cheap headline count of how much is there.
+    pub entries: usize,
 }
 
 /// A synced repository directory that no longer corresponds to the config.
@@ -99,6 +117,38 @@ impl ProviderInfo {
             (None, Some(re)) => full_path.map(|p| re.is_match(p)),
             (None, None) => None,
         }
+    }
+}
+
+/// Whether the local provider has a given module turned off — either the whole
+/// `local` entry is disabled, or the module is in its `disabled_modules`. With
+/// no `local` entry at all, the provider runs with defaults (everything on).
+fn local_module_disabled(cfg: &config::ProjectConfig, module: &str) -> bool {
+    match cfg.providers.iter().find(|e| e.name == "local") {
+        Some(e) => !e.enabled || !e.is_module_enabled(module),
+        None => false,
+    }
+}
+
+/// Whether any *enabled* provider in the config still backs `module` with that
+/// module enabled. Drives the whole-module highlight: when this is false and the
+/// `module/` dir exists, nothing in the config produces that module anymore.
+fn module_has_backing(cfg: &config::ProjectConfig, module: &str) -> bool {
+    cfg.providers.iter().any(|e| {
+        e.enabled
+            && e.is_module_enabled(module)
+            && provider_implements(&e.name, module)
+    })
+}
+
+/// Does a provider of this name implement the given module at all? Local backs
+/// every module; remote providers back only tasks and repos.
+fn provider_implements(name: &str, module: &str) -> bool {
+    match name {
+        "local" => matches!(module, "notes" | "tasks" | "bookmarks" | "repos"),
+        "github" | "gitlab" => matches!(module, "tasks" | "repos"),
+        "jira" => module == "tasks",
+        _ => false,
     }
 }
 
@@ -186,7 +236,11 @@ fn count_tasks(dir: &Path) -> (usize, usize, usize) {
     (files, open, closed)
 }
 
-fn detect_repos(root: &Path, providers: &HashMap<String, ProviderInfo>) -> Vec<RepoFinding> {
+fn detect_repos(
+    root: &Path,
+    providers: &HashMap<String, ProviderInfo>,
+    local_repos_disabled: bool,
+) -> Vec<RepoFinding> {
     let repos_root = root.join("repos");
     let mut findings = Vec::new();
 
@@ -197,6 +251,20 @@ fn detect_repos(root: &Path, providers: &HashMap<String, ProviderInfo>) -> Vec<R
             .unwrap_or("")
             .to_string();
         if display == "local" {
+            // Local repos are flagged only when the module is turned off for the
+            // local provider; otherwise they are user-managed and never stale.
+            if local_repos_disabled {
+                for repo_dir in subdirs(&provider_dir) {
+                    let name = repo_dir.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                    findings.push(RepoFinding {
+                        provider: "local".to_string(),
+                        name,
+                        path: rel(root, &repo_dir),
+                        reason: "module_disabled",
+                        git: git::inspect_repo(&repo_dir),
+                    });
+                }
+            }
             continue;
         }
 
@@ -239,7 +307,11 @@ fn detect_repos(root: &Path, providers: &HashMap<String, ProviderInfo>) -> Vec<R
     findings
 }
 
-fn detect_tasks(root: &Path, providers: &HashMap<String, ProviderInfo>) -> Vec<TaskFinding> {
+fn detect_tasks(
+    root: &Path,
+    providers: &HashMap<String, ProviderInfo>,
+    local_tasks_disabled: bool,
+) -> Vec<TaskFinding> {
     let tasks_root = root.join("tasks");
     let mut findings = Vec::new();
 
@@ -250,6 +322,21 @@ fn detect_tasks(root: &Path, providers: &HashMap<String, ProviderInfo>) -> Vec<T
             .unwrap_or("")
             .to_string();
         if display == "local" {
+            // Like remote `module_disabled`: one finding covering the whole
+            // local task tree, with open/closed counts, only when turned off.
+            if local_tasks_disabled {
+                let (files, open, closed) = count_tasks(&provider_dir);
+                if files > 0 {
+                    findings.push(TaskFinding {
+                        provider: "local".to_string(),
+                        path: rel(root, &provider_dir),
+                        reason: "module_disabled",
+                        files,
+                        open,
+                        closed,
+                    });
+                }
+            }
             continue;
         }
 
@@ -394,6 +481,43 @@ fn detect_local(root: &Path, module: &str) -> anyhow::Result<Vec<LocalFinding>> 
     Ok(findings)
 }
 
+/// Count the immediate entries under a module directory (provider subdirs for
+/// repos/tasks, label dirs and files for notes/bookmarks). Zero if absent.
+fn module_entry_count(root: &Path, module: &str) -> usize {
+    std::fs::read_dir(root.join(module))
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .count()
+}
+
+/// Detect whole module directories no enabled provider backs anymore. A module
+/// is flagged when its `module/` dir exists and is non-empty but
+/// [`module_has_backing`] is false.
+fn detect_orphaned_modules(root: &Path, cfg: &config::ProjectConfig, scan: impl Fn(&str) -> bool) -> Vec<ModuleFinding> {
+    const ALL: &[&str] = &["repos", "tasks", "notes", "bookmarks"];
+    let mut findings = Vec::new();
+    for &module in ALL {
+        if !scan(module) {
+            continue;
+        }
+        let dir = root.join(module);
+        if !dir.exists() || module_has_backing(cfg, module) {
+            continue;
+        }
+        let entries = module_entry_count(root, module);
+        if entries > 0 {
+            findings.push(ModuleFinding {
+                module: module.to_string(),
+                path: rel(root, &dir),
+                reason: "no_provider_backs_module",
+                entries,
+            });
+        }
+    }
+    findings
+}
+
 /// Build the full stale-data report. When `module` is set, only that module is
 /// scanned (and local modules are included only via this path).
 pub fn report(root: &Path, module: Option<&str>) -> anyhow::Result<TidyReport> {
@@ -403,12 +527,12 @@ pub fn report(root: &Path, module: Option<&str>) -> anyhow::Result<TidyReport> {
     let scan = |m: &str| module.map_or(true, |only| only == m);
 
     let repos = if scan("repos") {
-        detect_repos(root, &providers)
+        detect_repos(root, &providers, local_module_disabled(&cfg, "repos"))
     } else {
         Vec::new()
     };
     let tasks = if scan("tasks") {
-        detect_tasks(root, &providers)
+        detect_tasks(root, &providers, local_module_disabled(&cfg, "tasks"))
     } else {
         Vec::new()
     };
@@ -419,5 +543,7 @@ pub fn report(root: &Path, module: Option<&str>) -> anyhow::Result<TidyReport> {
         _ => Vec::new(),
     };
 
-    Ok(TidyReport { repos, tasks, local })
+    let modules = detect_orphaned_modules(root, &cfg, scan);
+
+    Ok(TidyReport { repos, tasks, local, modules })
 }
