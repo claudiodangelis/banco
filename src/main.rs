@@ -100,11 +100,12 @@ fn check_config(root: &Path) -> anyhow::Result<Vec<String>> {
     let mut issues = Vec::new();
 
     for entry in &project_config.providers {
-        let schema = match entry.name.as_str() {
-            "github" => GitHubProvider::available_config_schema(),
-            "gitlab" => GitLabProvider::available_config_schema(),
-            "jira"   => JiraProvider::available_config_schema(),
-            _        => continue,
+        let modules: Vec<&str> = match entry.name.as_str() {
+            "local"  => LocalProvider::available_modules(),
+            "github" => GitHubProvider::available_modules(),
+            "gitlab" => GitLabProvider::available_modules(),
+            "jira"   => JiraProvider::available_modules(),
+            _        => vec![],
         };
 
         let label = match &entry.alias {
@@ -112,9 +113,28 @@ fn check_config(root: &Path) -> anyhow::Result<Vec<String>> {
             None        => format!("provider '{}'", entry.name),
         };
 
-        let known: std::collections::HashSet<&str> = schema.iter().map(|p| p.name).collect();
+        let schema = match entry.name.as_str() {
+            "local"  => LocalProvider::available_config_schema(),
+            "github" => GitHubProvider::available_config_schema(),
+            "gitlab" => GitLabProvider::available_config_schema(),
+            "jira"   => JiraProvider::available_config_schema(),
+            // Unknown provider name: can't validate its modules or config.
+            _        => {
+                issues.push(format!("{label}: unknown provider '{}'", entry.name));
+                continue;
+            }
+        };
 
         let mut entry_issues = Vec::new();
+
+        let known_modules: std::collections::HashSet<&str> = modules.iter().copied().collect();
+        for module in &entry.disabled_modules {
+            if !known_modules.contains(module.as_str()) {
+                entry_issues.push(format!("{label}: unknown module '{module}' in disabled_modules"));
+            }
+        }
+
+        let known: std::collections::HashSet<&str> = schema.iter().map(|p| p.name).collect();
         for key in entry.config.keys() {
             if !known.contains(key.as_str()) {
                 entry_issues.push(format!("{label}: unknown parameter '{key}'"));
@@ -125,6 +145,7 @@ fn check_config(root: &Path) -> anyhow::Result<Vec<String>> {
                 entry_issues.push(format!("{label}: missing required parameter '{}'", param.name));
             }
         }
+
         entry_issues.sort();
         issues.extend(entry_issues);
     }
@@ -191,13 +212,6 @@ fn provider_add(root: &Path) -> anyhow::Result<()> {
                     cfg_map.insert(param.name.to_string(), serde_yaml::Value::String(value));
                 }
             }
-            provider::ConfigParamKind::Bool => {
-                let value = dialoguer::Confirm::with_theme(&theme)
-                    .with_prompt(&prompt)
-                    .default(true)
-                    .interact()?;
-                cfg_map.insert(param.name.to_string(), serde_yaml::Value::Bool(value));
-            }
             provider::ConfigParamKind::List => {
                 println!("{} (enter one per line, empty line to finish):", prompt);
                 let mut items = Vec::new();
@@ -218,10 +232,27 @@ fn provider_add(root: &Path) -> anyhow::Result<()> {
         }
     }
 
+    let modules = match name {
+        "github" => GitHubProvider::available_modules(),
+        "gitlab" => GitLabProvider::available_modules(),
+        "jira"   => JiraProvider::available_modules(),
+        _ => vec![],
+    };
+    let disabled_modules: Vec<String> = if modules.len() > 1 {
+        let selected = dialoguer::MultiSelect::with_theme(&theme)
+            .with_prompt("Modules to disable (space to toggle, enter to confirm; leave all unchecked to keep every module)")
+            .items(&modules)
+            .interact()?;
+        selected.into_iter().map(|i| modules[i].to_string()).collect()
+    } else {
+        Vec::new()
+    };
+
     let entry = config::ProviderEntry {
         name: name.to_string(),
         alias,
         enabled: true,
+        disabled_modules,
         config: cfg_map,
         browse: None,
     };
@@ -246,8 +277,19 @@ fn provider_list(root: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Build the local provider honoring its `disabled_modules` config, falling
+/// back to all modules enabled when there's no config or no local entry.
+fn local_provider(root: &Path) -> LocalProvider {
+    let disabled = config::load(root)
+        .ok()
+        .and_then(|c| c.providers.into_iter().find(|e| e.name == "local"))
+        .map(|e| e.disabled_modules)
+        .unwrap_or_default();
+    LocalProvider::with_disabled(disabled)
+}
+
 pub(crate) fn build_context(root: &Path) -> anyhow::Result<ContextOutput> {
-    let local = LocalProvider::new();
+    let local = local_provider(root);
     let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
     let mut providers = vec![ProviderContext {
         name: local.name().to_string(),
@@ -282,7 +324,7 @@ fn remote_providers(root: &Path) -> anyhow::Result<Vec<Box<dyn Provider>>> {
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let root = std::env::current_dir().context("failed to get current directory")?;
-    let local = LocalProvider::new();
+    let local = local_provider(&root);
 
     let Some(command) = cli.command else {
         return tui::dashboard(&root, build_context(&root)?);
@@ -308,6 +350,7 @@ fn run() -> anyhow::Result<()> {
                         name: "local".to_string(),
                         alias: None,
                         enabled: true,
+                        disabled_modules: Vec::new(),
                         config: std::collections::HashMap::new(),
                         browse: None,
                     }],

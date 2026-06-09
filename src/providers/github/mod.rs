@@ -31,6 +31,10 @@ impl GitHubProvider {
         Self { entry }
     }
 
+    pub fn available_modules() -> Vec<&'static str> {
+        vec!["tasks", "repos"]
+    }
+
     pub fn available_config_schema() -> Vec<ConfigParam> {
         vec![
             ConfigParam {
@@ -43,12 +47,6 @@ impl GitHubProvider {
                 name: "host",
                 description: "GitHub instance URL (default: https://github.com) — set for GitHub Enterprise Server",
                 kind: ConfigParamKind::String,
-                required: false,
-            },
-            ConfigParam {
-                name: "sync_issues",
-                description: "Sync issues as tasks (default: true)",
-                kind: ConfigParamKind::Bool,
                 required: false,
             },
             ConfigParam {
@@ -203,8 +201,12 @@ impl Provider for GitHubProvider {
     }
 
     fn init(&self, root: &Path) -> anyhow::Result<()> {
-        std::fs::create_dir_all(self.tasks_root(root))?;
-        self.github_repos(root).init(root)?;
+        if self.entry.is_module_enabled("tasks") {
+            std::fs::create_dir_all(self.tasks_root(root))?;
+        }
+        if self.entry.is_module_enabled("repos") {
+            self.github_repos(root).init(root)?;
+        }
         Ok(())
     }
 
@@ -218,14 +220,15 @@ impl Provider for GitHubProvider {
             projects.retain(|p| re.is_match(p));
         }
 
-        let sync_tasks = opts.module.as_deref().map_or(true, |m| m == "tasks");
-        let sync_repos = opts.module.as_deref().map_or(true, |m| m == "repos");
+        let sync_tasks = opts.module.as_deref().map_or(true, |m| m == "tasks")
+            && self.entry.is_module_enabled("tasks");
+        let sync_repos = opts.module.as_deref().map_or(true, |m| m == "repos")
+            && self.entry.is_module_enabled("repos");
 
-        let sync_issues = self.entry.get_bool("sync_issues", true);
         let template_base = "tasks";
         let synced_at = sync_state::now();
 
-        if sync_tasks && sync_issues {
+        if sync_tasks {
             for owner_repo in &projects {
                 let owner = owner_repo.split('/').next().unwrap_or(owner_repo);
                 let repo_name = owner_repo.rsplit('/').next().unwrap_or(owner_repo);
@@ -280,7 +283,7 @@ impl Provider for GitHubProvider {
         // Tasks: derive issue URL from path tasks/{provider}/{owner}/{repo}/{n} - {title}.md
         let tasks_base = self.tasks_root(root);
         let mut task_items: Vec<BrowseItem> = Vec::new();
-        if tasks_base.exists() {
+        if self.entry.is_module_enabled("tasks") && tasks_base.exists() {
             for entry in WalkDir::new(&tasks_base)
                 .min_depth(3).max_depth(3)
                 .into_iter()
@@ -315,7 +318,7 @@ impl Provider for GitHubProvider {
         // Repos: read git remote origin from each cloned repo directory
         let repos_base = self.repos_root(root);
         let mut repo_items: Vec<BrowseItem> = Vec::new();
-        if repos_base.exists() {
+        if self.entry.is_module_enabled("repos") && repos_base.exists() {
             let mut entries: Vec<_> = std::fs::read_dir(&repos_base)?
                 .filter_map(|e| e.ok())
                 .collect();
@@ -349,7 +352,7 @@ impl Provider for GitHubProvider {
         let issues_base = self.tasks_root(root);
         let mut issue_items: Vec<Value> = Vec::new();
 
-        if issues_base.exists() {
+        if self.entry.is_module_enabled("tasks") && issues_base.exists() {
             for entry in WalkDir::new(&issues_base)
                 .min_depth(3)
                 .max_depth(3)
@@ -389,10 +392,9 @@ impl Provider for GitHubProvider {
             }
         }
 
-        let repo_items = self.github_repos(root).context(root)?;
-
-        Ok(vec![
-            ModuleContext {
+        let mut modules = Vec::new();
+        if self.entry.is_module_enabled("tasks") {
+            modules.push(ModuleContext {
                 name: "tasks".to_string(),
                 labels: vec![
                     Label {
@@ -409,12 +411,17 @@ impl Provider for GitHubProvider {
                     },
                 ],
                 items: issue_items,
-            },
-            ModuleContext {
+            });
+        }
+        if self.entry.is_module_enabled("repos") {
+            let repo_items = self.github_repos(root).context(root)?;
+            modules.push(ModuleContext {
                 name: "repos".to_string(),
                 labels: vec![],
                 items: repo_items,
-            },
-        ])
+            });
+        }
+
+        Ok(modules)
     }
 }

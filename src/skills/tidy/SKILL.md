@@ -62,10 +62,10 @@ counts. Highlight `open` issues especially — removing them drops the user's lo
 copy of issues that may still be active. Task files can also hold local edits
 (notes, extra frontmatter) beyond the synced issue, which would be lost.
 
-`reason` values: `sync_disabled` (`sync_issues: false`), `removed_from_config`,
-`provider_disabled`, `provider_removed`.
+`reason` values: `module_disabled` (the module is in the provider's
+`disabled_modules`), `removed_from_config`, `provider_disabled`, `provider_removed`.
 
-If the user turned syncing off but wants to keep the snapshot, leaving the files
+If the user turned a module off but wants to keep the snapshot, leaving the files
 in place is a valid choice — say so.
 
 ## Local — review content before retiring a module
@@ -79,6 +79,15 @@ When the user wants to stop using notes or bookmarks, run
 
 Summarize what looks relevant and let the user decide item by item. Never bulk
 delete local content.
+
+## Also check the config itself
+
+`tidy` only finds stale *data*. A config change that stranded data may also have
+left the config malformed — a typo'd key, a renamed parameter, an invalid
+`disabled_modules` entry. After tidying (or if the user just edited
+`.banco/config.yml`), suggest running `banco check`, which validates the config
+and project layout. The two are complementary: `tidy` prunes orphaned data,
+`check` flags an invalid config.
 
 ## Principles
 

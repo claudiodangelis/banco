@@ -72,17 +72,18 @@ Each task directory whose issues are no longer synced, with file counts split by
 {
   "provider": "github",
   "path": "tasks/github",
-  "reason": "sync_disabled",
+  "reason": "module_disabled",
   "files": 12,
   "open": 5,
   "closed": 7
 }
 ```
 
-`reason` is one of `sync_disabled` (the provider's `sync_issues` is `false`),
-`removed_from_config`, `provider_disabled`, or `provider_removed`. Per-project detection
-(`removed_from_config`) applies to GitHub projects and to GitLab projects configured via an
-explicit `projects` list.
+`reason` is one of `module_disabled` (the module is listed in the provider's
+`disabled_modules`), `removed_from_config`, `provider_disabled`, or `provider_removed`.
+Per-project detection (`removed_from_config`) applies to GitHub projects and to GitLab projects
+configured via an explicit `projects` list. The `module_disabled` reason applies to both the
+`tasks` and `repos` modules.
 
 ### local
 

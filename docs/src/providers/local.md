@@ -13,4 +13,10 @@ plain files and directories on your filesystem, managed entirely by you.
 | `bookmarks` | `bookmarks/local/`   | Markdown files                      | `label` (string, optional — nested tag, e.g. `tools/rust`), `url` (string) |
 | `repos`     | `repos/local/`       | Directories, `git init` on create   | —                                                                           |
 
+Any of these modules can be turned off with the top-level
+[`disabled_modules`](../concepts/providers.md) field on the local provider entry — e.g.
+`disabled_modules: [bookmarks, repos]`. A disabled local module is omitted from `banco context`
+and `banco browse`, and `banco new <module>` will refuse to create items in it. Existing files
+are left untouched.
+
 > **Note:** Gerrit provider is planned and will be available soon.

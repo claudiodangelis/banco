@@ -56,13 +56,19 @@ Every provider entry in `.banco/config.yml` is validated against its known schem
 
 - **Unknown parameters** — keys in the `config:` block that are not recognised by the provider are flagged.
 - **Missing required parameters** — keys that the provider requires but are absent from the `config:` block are flagged.
+- **Unknown disabled modules** — names in the `disabled_modules:` list that the provider does not implement are flagged.
+- **Unknown provider** — an entry whose `name` is not a known provider is flagged.
 
 ```
 config: provider 'github': unknown parameter 'token'
 config: provider 'jira' (alias 'work-jira'): missing required parameter 'agent_backend'
+config: provider 'github': unknown module 'task' in disabled_modules
+config: provider 'local': unknown parameter 'bogus_key'
 ```
 
-The `local` provider has no configuration schema and is not validated.
+The `local` provider takes no configuration parameters, so any key under its `config:` block is
+flagged as an unknown parameter. Its `disabled_modules` list is validated against the modules it
+implements (`notes`, `tasks`, `bookmarks`, `repos`).
 
 ## Unmanaged content
 
