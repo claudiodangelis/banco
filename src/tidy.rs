@@ -74,8 +74,10 @@ enum Kind {
 struct ProviderInfo {
     kind: Kind,
     enabled: bool,
-    /// Whether issue syncing is on (github/gitlab `sync_issues`, default true).
-    syncs_tasks: bool,
+    /// Whether the tasks module is on (absent from `disabled_modules`).
+    tasks_enabled: bool,
+    /// Whether the repos module is on (absent from `disabled_modules`).
+    repos_enabled: bool,
     /// Explicit `projects` as full paths (owner/repo, namespace/project).
     explicit: Option<HashSet<String>>,
     /// Compiled `projects_pattern`, if set.
@@ -124,7 +126,8 @@ fn build_provider_map(cfg: &config::ProjectConfig) -> HashMap<String, ProviderIn
             ProviderInfo {
                 kind,
                 enabled: entry.enabled,
-                syncs_tasks: entry.get_bool("sync_issues", true),
+                tasks_enabled: entry.is_module_enabled("tasks"),
+                repos_enabled: entry.is_module_enabled("repos"),
                 explicit,
                 pattern,
             },
@@ -209,6 +212,7 @@ fn detect_repos(root: &Path, providers: &HashMap<String, ProviderInfo>) -> Vec<R
             let reason: Option<&'static str> = match info {
                 None => Some("provider_removed"),
                 Some(p) if !p.enabled => Some("provider_disabled"),
+                Some(p) if !p.repos_enabled => Some("module_disabled"),
                 Some(p) if p.kind == Kind::Other => None,
                 Some(p) => {
                     let full = repo_full_path(&repo_dir);
@@ -255,7 +259,7 @@ fn detect_tasks(root: &Path, providers: &HashMap<String, ProviderInfo>) -> Vec<T
         let provider_reason: Option<&'static str> = match info {
             None => Some("provider_removed"),
             Some(p) if !p.enabled => Some("provider_disabled"),
-            Some(p) if !p.syncs_tasks => Some("sync_disabled"),
+            Some(p) if !p.tasks_enabled => Some("module_disabled"),
             Some(_) => None,
         };
 

@@ -30,6 +30,10 @@ impl GitLabProvider {
         Self { entry }
     }
 
+    pub fn available_modules() -> Vec<&'static str> {
+        vec!["tasks", "repos"]
+    }
+
     pub fn available_config_schema() -> Vec<ConfigParam> {
         vec![
             ConfigParam {
@@ -42,12 +46,6 @@ impl GitLabProvider {
                 name: "host",
                 description: "GitLab instance URL (default: https://gitlab.com)",
                 kind: ConfigParamKind::String,
-                required: false,
-            },
-            ConfigParam {
-                name: "sync_issues",
-                description: "Sync issues as tasks (default: true)",
-                kind: ConfigParamKind::Bool,
                 required: false,
             },
             ConfigParam {
@@ -196,8 +194,12 @@ impl Provider for GitLabProvider {
     }
 
     fn init(&self, root: &Path) -> anyhow::Result<()> {
-        std::fs::create_dir_all(self.tasks_root(root))?;
-        self.gitlab_repos(root).init(root)?;
+        if self.entry.is_module_enabled("tasks") {
+            std::fs::create_dir_all(self.tasks_root(root))?;
+        }
+        if self.entry.is_module_enabled("repos") {
+            self.gitlab_repos(root).init(root)?;
+        }
         Ok(())
     }
 
@@ -211,14 +213,15 @@ impl Provider for GitLabProvider {
             projects.retain(|p| re.is_match(p));
         }
 
-        let sync_tasks = opts.module.as_deref().map_or(true, |m| m == "tasks");
-        let sync_repos = opts.module.as_deref().map_or(true, |m| m == "repos");
+        let sync_tasks = opts.module.as_deref().map_or(true, |m| m == "tasks")
+            && self.entry.is_module_enabled("tasks");
+        let sync_repos = opts.module.as_deref().map_or(true, |m| m == "repos")
+            && self.entry.is_module_enabled("repos");
 
-        let sync_issues = self.entry.get_bool("sync_issues", true);
         let template_base = "tasks";
         let synced_at = sync_state::now();
 
-        if sync_tasks && sync_issues {
+        if sync_tasks {
             for namespace_project in &projects {
                 let project = client.project(namespace_project)?;
                 let task_dir = self.tasks_root(root).join(&project.path);
@@ -277,7 +280,7 @@ impl Provider for GitLabProvider {
         // Repos: read git remote origin; also fills slug_to_url for projects_pattern users.
         let repos_base = self.repos_root(root);
         let mut repo_items: Vec<BrowseItem> = Vec::new();
-        if repos_base.exists() {
+        if self.entry.is_module_enabled("repos") && repos_base.exists() {
             let mut entries: Vec<_> = std::fs::read_dir(&repos_base)?
                 .filter_map(|e| e.ok())
                 .collect();
@@ -309,7 +312,7 @@ impl Provider for GitLabProvider {
         // slug_to_url resolves the project slug to its full base URL.
         let tasks_base = self.tasks_root(root);
         let mut task_items: Vec<BrowseItem> = Vec::new();
-        if tasks_base.exists() {
+        if self.entry.is_module_enabled("tasks") && tasks_base.exists() {
             for entry in WalkDir::new(&tasks_base)
                 .min_depth(2).max_depth(2)
                 .into_iter()
@@ -349,7 +352,7 @@ impl Provider for GitLabProvider {
         let issues_base = self.tasks_root(root);
         let mut issue_items: Vec<Value> = Vec::new();
 
-        if issues_base.exists() {
+        if self.entry.is_module_enabled("tasks") && issues_base.exists() {
             for entry in WalkDir::new(&issues_base)
                 .min_depth(2)
                 .max_depth(2)
@@ -388,10 +391,9 @@ impl Provider for GitLabProvider {
             }
         }
 
-        let repo_items = self.gitlab_repos(root).context(root)?;
-
-        Ok(vec![
-            ModuleContext {
+        let mut modules = Vec::new();
+        if self.entry.is_module_enabled("tasks") {
+            modules.push(ModuleContext {
                 name: "tasks".to_string(),
                 labels: vec![
                     Label {
@@ -408,12 +410,17 @@ impl Provider for GitLabProvider {
                     },
                 ],
                 items: issue_items,
-            },
-            ModuleContext {
+            });
+        }
+        if self.entry.is_module_enabled("repos") {
+            let repo_items = self.gitlab_repos(root).context(root)?;
+            modules.push(ModuleContext {
                 name: "repos".to_string(),
                 labels: vec![],
                 items: repo_items,
-            },
-        ])
+            });
+        }
+
+        Ok(modules)
     }
 }

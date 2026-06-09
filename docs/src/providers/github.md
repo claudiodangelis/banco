@@ -12,11 +12,14 @@ Set interactively via `banco provider add`.
 | ------------------ | -------- | ---------------------------------------------------------------------------------------- |
 | `api_key`          | yes      | GitHub personal access token                                                             |
 | `host`             | no       | GitHub instance URL (default: `https://github.com`) — set for GitHub Enterprise Server  |
-| `sync_issues`      | no       | Sync issues as tasks (default: `true`)                                                   |
 | `projects`         | no †     | Explicit list of project paths in `owner/repo` format                                    |
 | `projects_pattern` | no †     | Regex matched against `owner/repo` — e.g. `myorg/.*`                                    |
 
 † Exactly one of `projects` or `projects_pattern` must be set; they are mutually exclusive.
+
+The GitHub provider implements two modules, `tasks` and `repos`. Turn either off with the
+top-level [`disabled_modules`](../concepts/providers.md) field — e.g. `disabled_modules: [repos]`
+to sync issues only.
 
 ### Example configuration
 

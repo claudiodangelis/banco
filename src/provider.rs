@@ -13,7 +13,6 @@ pub struct ConfigParam {
 pub enum ConfigParamKind {
     String,
     List,
-    Bool,
 }
 
 pub struct SyncOpts {

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use crate::context::ModuleContext;
 use crate::module::{BrowseItem, Module};
-use crate::provider::Provider;
+use crate::provider::{ConfigParam, Provider};
 
 pub struct CheckFindings {
     pub extraneous_dirs: Vec<PathBuf>,
@@ -18,25 +18,55 @@ pub struct CheckFindings {
 
 pub struct LocalProvider {
     modules: Vec<Box<dyn Module>>,
+    /// Modules turned off via the local provider's `disabled_modules` config.
+    /// They stay in `modules` (so `check` still treats their dirs as owned) but
+    /// are skipped for init/context/browse and refused by `find_module`.
+    disabled: Vec<String>,
 }
 
 impl LocalProvider {
     pub fn new() -> Self {
+        Self::with_disabled(Vec::new())
+    }
+
+    pub fn with_disabled(disabled: Vec<String>) -> Self {
         Self {
             modules: vec![Box::new(notes::Notes), Box::new(tasks::Tasks), Box::new(bookmarks::Bookmarks), Box::new(repos::Repos)],
+            disabled,
         }
     }
 
+    pub fn available_modules() -> Vec<&'static str> {
+        vec!["notes", "tasks", "bookmarks", "repos"]
+    }
+
+    /// The local provider takes no config parameters today. Returning an empty
+    /// schema lets `banco check` validate it uniformly with remote providers —
+    /// any key under `local.config` is flagged as extraneous, and the moment a
+    /// real parameter is added here it is validated automatically.
+    pub fn available_config_schema() -> Vec<ConfigParam> {
+        vec![]
+    }
+
+    fn is_enabled(&self, module_name: &str) -> bool {
+        !self.disabled.iter().any(|m| m == module_name)
+    }
+
+    /// Active modules only — the ones not listed in `disabled_modules`.
+    fn enabled_modules(&self) -> impl Iterator<Item = &Box<dyn Module>> {
+        self.modules.iter().filter(|m| self.is_enabled(m.name()))
+    }
+
     pub fn find_module(&self, cli_name: &str) -> Option<&dyn Module> {
-        self.modules.iter().find(|m| m.cli_name() == cli_name).map(|m| m.as_ref())
+        self.enabled_modules().find(|m| m.cli_name() == cli_name).map(|m| m.as_ref())
     }
 
     pub fn all_template_paths(&self, root: &Path) -> Vec<String> {
-        self.modules.iter().flat_map(|m| m.template_paths(root)).collect()
+        self.enabled_modules().flat_map(|m| m.template_paths(root)).collect()
     }
 
     pub fn module_descriptions(&self) -> Vec<String> {
-        self.modules.iter().map(|m| m.describe()).collect()
+        self.enabled_modules().map(|m| m.describe()).collect()
     }
 
     pub fn check(&self, root: &Path) -> anyhow::Result<CheckFindings> {
@@ -91,15 +121,14 @@ impl Provider for LocalProvider {
     }
 
     fn init(&self, root: &Path) -> anyhow::Result<()> {
-        for module in &self.modules {
+        for module in self.enabled_modules() {
             module.init(root)?;
         }
         Ok(())
     }
 
     fn context(&self, root: &Path) -> anyhow::Result<Vec<ModuleContext>> {
-        self.modules
-            .iter()
+        self.enabled_modules()
             .map(|m| {
                 Ok(ModuleContext {
                     name: m.name().to_string(),
@@ -112,7 +141,7 @@ impl Provider for LocalProvider {
 
     fn browse_modules(&self, root: &Path) -> anyhow::Result<Vec<(String, Vec<BrowseItem>)>> {
         let mut result = Vec::new();
-        for module in &self.modules {
+        for module in self.enabled_modules() {
             let items = module.browse_items(root)?;
             if !items.is_empty() {
                 result.push((module.name().to_string(), items));

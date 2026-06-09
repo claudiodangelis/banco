@@ -14,19 +14,25 @@ environment variables using `$VAR` or `${VAR}` — banco expands them at runtime
 Add a provider interactively with `banco provider add`, or edit the config file
 directly. Add an `alias` field when configuring multiple providers of the same kind.
 
+Every provider entry accepts two optional top-level fields: `enabled` (default
+`true`; set `false` to switch a provider off without deleting its config) and
+`disabled_modules` (a list of module names to turn off for that provider while
+leaving the rest active — e.g. sync GitHub issues but not repositories). This
+applies to the built-in `local` provider too.
+
 ### GitHub
 
 ```yaml
 providers:
   - name: github
     # alias: github-work        # optional; required when adding a second github provider
+    # disabled_modules: [repos] # optional; modules to turn off (tasks, repos)
     config:
       api_key: $GITHUB_TOKEN    # required
       # host: https://github.mycompany.com  # optional; for GitHub Enterprise
       projects:                 # required — or use projects_pattern (mutually exclusive)
         - myorg/my-project
       # projects_pattern: myorg/.*
-      # sync_issues: false      # optional; default true
 ```
 
 ### GitLab
@@ -35,13 +41,13 @@ providers:
 providers:
   - name: gitlab
     # alias: gitlab-work
+    # disabled_modules: [repos] # optional; modules to turn off (tasks, repos)
     config:
       api_key: $GITLAB_TOKEN    # required
       # host: https://gitlab.mycompany.com  # optional; for self-hosted instances
       projects:                 # required — or use projects_pattern (mutually exclusive)
         - mygroup/my-project
       # projects_pattern: mygroup/.*
-      # sync_issues: false      # optional; default true
 ```
 
 ### JIRA

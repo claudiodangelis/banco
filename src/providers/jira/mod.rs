@@ -24,6 +24,10 @@ impl JiraProvider {
         Self { entry }
     }
 
+    pub fn available_modules() -> Vec<&'static str> {
+        vec!["tasks"]
+    }
+
     pub fn available_config_schema() -> Vec<ConfigParam> {
         vec![
             ConfigParam {
@@ -82,13 +86,19 @@ impl Provider for JiraProvider {
     }
 
     fn init(&self, root: &Path) -> anyhow::Result<()> {
-        std::fs::create_dir_all(self.tasks_root(root))?;
+        if self.entry.is_module_enabled("tasks") {
+            std::fs::create_dir_all(self.tasks_root(root))?;
+        }
         Ok(())
     }
 
     fn sync(&self, root: &Path, opts: &SyncOpts) -> anyhow::Result<()> {
         if opts.module.as_deref() == Some("repos") {
             println!("  skipping: jira provider has no repos module");
+            return Ok(());
+        }
+        if !self.entry.is_module_enabled("tasks") {
+            println!("  skipping: tasks module is disabled for {}", self.entry.display_name());
             return Ok(());
         }
 
@@ -171,6 +181,10 @@ impl Provider for JiraProvider {
     }
 
     fn context(&self, root: &Path) -> anyhow::Result<Vec<ModuleContext>> {
+        if !self.entry.is_module_enabled("tasks") {
+            return Ok(vec![]);
+        }
+
         let tasks_base = self.tasks_root(root);
         let mut items: Vec<Value> = Vec::new();
 
@@ -233,6 +247,10 @@ impl Provider for JiraProvider {
     }
 
     fn browse_modules(&self, root: &Path) -> anyhow::Result<Vec<(String, Vec<BrowseItem>)>> {
+        if !self.entry.is_module_enabled("tasks") {
+            return Ok(vec![]);
+        }
+
         let tasks_base = self.tasks_root(root);
         let host = self.host();
         if host.is_empty() {

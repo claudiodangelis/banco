@@ -30,6 +30,10 @@ pub struct ProviderEntry {
     pub alias: Option<String>,
     #[serde(default = "default_true", skip_serializing_if = "std::ops::Not::not")]
     pub enabled: bool,
+    /// Modules to turn off for this provider without removing its config.
+    /// Omitted (empty) means every module the provider implements is on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub disabled_modules: Vec<String>,
     #[serde(default)]
     pub config: HashMap<String, serde_yaml::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -55,8 +59,10 @@ impl ProviderEntry {
         self.config.get(key).and_then(|v| v.as_str()).map(expand_env)
     }
 
-    pub fn get_bool(&self, key: &str, default: bool) -> bool {
-        self.config.get(key).and_then(|v| v.as_bool()).unwrap_or(default)
+    /// Whether the named module is active for this provider — true unless the
+    /// module appears in `disabled_modules`.
+    pub fn is_module_enabled(&self, module: &str) -> bool {
+        !self.disabled_modules.iter().any(|m| m == module)
     }
 
     pub fn get_list(&self, key: &str) -> Vec<String> {
