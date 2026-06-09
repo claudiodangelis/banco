@@ -34,6 +34,8 @@
 - [sync](commands/sync.md)
 - [browse](commands/browse.md)
 - [check](commands/check.md)
+- [tidy](commands/tidy.md)
+- [skills](commands/skills.md)
 - [completions](commands/completions.md)
 
 # Reference
