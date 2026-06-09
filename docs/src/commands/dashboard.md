@@ -69,17 +69,18 @@ diffs and never leaks between users.
 
 | Key | Action |
 |---|---|
+| `?` | Toggle shortcuts overlay |
+| `c` | Open the config editor |
+| `d` | Open check panel |
+| `Esc` | Close overlay |
 | `j` / `k` | Next / previous provider |
+| `q` | Quit |
+| `v` | Collapse / expand the focused provider |
+| `Ctrl+C` | Quit |
+| `Ctrl+S` | Sync, then reload the dashboard with the freshly synced items |
 | `Tab` | Next module (overflows to first module of next provider) |
 | `Shift+Tab` | Previous module (underflows to last module of previous provider) |
 | `Space` | Browse all items in the focused module |
-| `v` | Collapse / expand the focused provider |
-| `d` | Open check panel |
-| `c` | Open the config editor |
-| `Ctrl+S` | Sync, then reload the dashboard with the freshly synced items |
-| `?` | Toggle shortcuts overlay |
-| `Esc` | Close overlay |
-| `q`, `Ctrl+C` | Quit |
 
 Press `?` at any time to show the shortcuts panel as an overlay over the dashboard.
 
