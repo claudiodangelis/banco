@@ -18,3 +18,8 @@ result to `.banco/config.yml`.
 ## provider list
 
 Prints the name (or alias) of each configured provider.
+
+## Editing in the dashboard
+
+The [dashboard](dashboard.md) also offers an interactive config editor (press `c`) for adding,
+removing, enabling, and reconfiguring providers without editing `.banco/config.yml` by hand.

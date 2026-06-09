@@ -13,12 +13,16 @@ lost first.**
 ## How it works
 
 Run `banco tidy --pretty` to get a JSON report of stale data. It is
-detection-only — it never deletes. The report has three arrays:
+detection-only — it never deletes. The report has four arrays:
 
-- `repos` — synced repository directories no longer matching the config
-- `tasks` — task directories whose issues are no longer synced
+- `repos` — repository directories no longer matching the config (remote, and
+  `repos/local` when the repos module is turned off for the local provider)
+- `tasks` — task directories whose issues are no longer synced (remote, and
+  `tasks/local` when the tasks module is turned off for the local provider)
 - `local` — local notes/bookmarks surfaced for review (only when you pass
   `--module notes` or `--module bookmarks`)
+- `modules` — whole module directories (`repos/`, `tasks/`, …) that no enabled
+  provider backs anymore
 
 To review a single module, pass `--module <repos|tasks|notes|bookmarks>`.
 
@@ -63,7 +67,12 @@ copy of issues that may still be active. Task files can also hold local edits
 (notes, extra frontmatter) beyond the synced issue, which would be lost.
 
 `reason` values: `module_disabled` (the module is in the provider's
-`disabled_modules`), `removed_from_config`, `provider_disabled`, `provider_removed`.
+`disabled_modules`, or — for `local` — the module or whole local provider is
+turned off), `removed_from_config`, `provider_disabled`, `provider_removed`.
+
+Local findings (`provider: "local"`) are user-authored, not synced from a remote,
+so there is no upstream copy to fall back on — treat them with extra care. Repo
+findings still carry the `git` block; tasks still report `open`/`closed` counts.
 
 If the user turned a module off but wants to keep the snapshot, leaving the files
 in place is a valid choice — say so.
@@ -79,6 +88,20 @@ When the user wants to stop using notes or bookmarks, run
 
 Summarize what looks relevant and let the user decide item by item. Never bulk
 delete local content.
+
+## Modules — a whole tree may be orphaned
+
+Each `modules` finding means an entire top-level directory (`repos/`, `tasks/`,
+`notes/`, `bookmarks/`) is no longer backed by any enabled provider — typically
+because the user disabled that module everywhere, or disabled the local provider
+that was its only source. `reason` is `no_provider_backs_module`; `entries` is
+how many immediate items the directory holds.
+
+Treat this as the headline, not a separate deletion target: the contents are
+detailed in the `repos`/`tasks` findings for the same paths. Walk the user
+through those (with their git-safety and open-count warnings) first; only offer
+to remove the whole `module/` directory once everything inside it has been
+accounted for and the user accepts it.
 
 ## Also check the config itself
 

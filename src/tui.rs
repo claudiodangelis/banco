@@ -10,7 +10,9 @@ use crossterm::{
 };
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 
+use crate::config::{self, BrowseConfig, ProjectConfig, ProviderEntry};
 use crate::context::{ContextOutput, Label, ModuleContext, ProviderContext};
+use crate::provider::{ConfigParam, ConfigParamKind};
 use crate::providers::local::LocalProvider;
 
 struct CheckDetail {
@@ -179,6 +181,26 @@ fn render_and_wait(stdout: &mut impl Write, root: &Path, mut ctx: ContextOutput)
 
                     (KeyCode::Char('d'), KeyModifiers::NONE) if !show_help => {
                         show_check_panel(stdout, root)?;
+                        redraw!(stdout);
+                    }
+
+                    (KeyCode::Char('c'), KeyModifiers::NONE) if !show_help => {
+                        let changed = show_config_editor(stdout, root)?;
+                        // Editing config can enable/disable providers or modules,
+                        // which changes what the dashboard shows — rebuild as we
+                        // do after a sync.
+                        if changed {
+                            if let Ok(fresh) = crate::build_context(root) {
+                                ctx = fresh;
+                                let nav = build_nav_index(&ctx);
+                                visible_mods = nav.visible_mods;
+                                total_vp = nav.total_vp;
+                                vp_map = nav.vp_map;
+                                focus_p = focus_p.min(total_vp.saturating_sub(1));
+                                let mods_here = visible_mods.get(focus_p).copied().unwrap_or(0);
+                                focus_m = focus_m.min(mods_here.saturating_sub(1));
+                            }
+                        }
                         redraw!(stdout);
                     }
 
@@ -755,6 +777,7 @@ fn render_help_overlay(stdout: &mut impl Write) -> anyhow::Result<()> {
         ("Space",      "browse module items"),
         ("v",          "collapse / expand provider"),
         ("d",          "check panel"),
+        ("c",          "edit config"),
         ("Ctrl+S",     "sync"),
         ("q",          "quit"),
         ("Ctrl+C",     "quit"),
@@ -911,6 +934,545 @@ fn render_check_panel(stdout: &mut impl Write, root: &Path, detail: &CheckDetail
     Ok(())
 }
 
+// ── config editor ─────────────────────────────────────────────────────────────
+
+const HILITE: &str = "\x1b[48;2;60;40;10m"; // selected-row background
+
+/// Config schema for a provider name, or empty for unknown/local.
+fn provider_schema(name: &str) -> Vec<ConfigParam> {
+    use crate::providers::{github::GitHubProvider, gitlab::GitLabProvider, jira::JiraProvider};
+    match name {
+        "github" => GitHubProvider::available_config_schema(),
+        "gitlab" => GitLabProvider::available_config_schema(),
+        "jira"   => JiraProvider::available_config_schema(),
+        _        => LocalProvider::available_config_schema(),
+    }
+}
+
+/// Modules a provider implements (used for the per-module on/off toggles).
+fn provider_modules(name: &str) -> Vec<&'static str> {
+    use crate::providers::{github::GitHubProvider, gitlab::GitLabProvider, jira::JiraProvider};
+    match name {
+        "local"  => LocalProvider::available_modules(),
+        "github" => GitHubProvider::available_modules(),
+        "gitlab" => GitLabProvider::available_modules(),
+        "jira"   => JiraProvider::available_modules(),
+        _        => vec![],
+    }
+}
+
+/// In-memory validation of a single entry, mirroring `check_config` in main.rs:
+/// unknown/missing parameters and unknown disabled modules.
+fn entry_issues(entry: &ProviderEntry) -> Vec<String> {
+    let mut issues = Vec::new();
+    let modules = provider_modules(&entry.name);
+    if modules.is_empty() {
+        issues.push(format!("unknown provider '{}'", entry.name));
+        return issues;
+    }
+    let known_modules: std::collections::HashSet<&str> = modules.iter().copied().collect();
+    for m in &entry.disabled_modules {
+        if !known_modules.contains(m.as_str()) {
+            issues.push(format!("unknown module '{m}' in disabled_modules"));
+        }
+    }
+    let schema = provider_schema(&entry.name);
+    let known: std::collections::HashSet<&str> = schema.iter().map(|p| p.name).collect();
+    for key in entry.config.keys() {
+        if !known.contains(key.as_str()) {
+            issues.push(format!("unknown parameter '{key}'"));
+        }
+    }
+    for param in &schema {
+        if param.required && !entry.config.contains_key(param.name) {
+            issues.push(format!("missing required parameter '{}'", param.name));
+        }
+    }
+    issues.sort();
+    issues
+}
+
+/// Draw a centered, bordered panel of content lines with a title and footer
+/// hint. When `cursor` is `Some(i)`, content line `i` is drawn highlighted.
+/// Clears the screen first so it reads as a modal page over the dashboard.
+fn draw_panel(
+    stdout: &mut impl Write,
+    title: &str,
+    lines: &[(&'static str, String)],
+    hint: &str,
+    cursor: Option<usize>,
+) -> anyhow::Result<()> {
+    let (tw, th) = terminal::size().unwrap_or((80, 24));
+
+    let max_line = lines.iter().map(|(_, s)| s.chars().count()).max().unwrap_or(0);
+    let inner_w = max_line
+        .max(hint.chars().count() + 2)
+        .max(title.chars().count() + 2)
+        .min((tw as usize).saturating_sub(4))
+        .max(20);
+
+    // top + blank + content + blank + hint + bottom
+    let panel_h = (lines.len() + 4) as u16;
+    let panel_w = (inner_w + 4) as u16;
+    let col = tw.saturating_sub(panel_w) / 2;
+    let row = th.saturating_sub(panel_h) / 2;
+
+    queue!(stdout, terminal::Clear(ClearType::All))?;
+
+    let title_bar = format!(" {title} ");
+    let top_dashes = (inner_w + 2).saturating_sub(title_bar.chars().count());
+    execute!(stdout, cursor::MoveTo(col, row))?;
+    write!(stdout, "{ORANGE}┌{title_bar}{}┐{RESET}", "─".repeat(top_dashes))?;
+
+    execute!(stdout, cursor::MoveTo(col, row + 1))?;
+    write!(stdout, "{ORANGE}│{}│{RESET}", " ".repeat(inner_w + 2))?;
+
+    for (i, (color, text)) in lines.iter().enumerate() {
+        execute!(stdout, cursor::MoveTo(col, row + 2 + i as u16))?;
+        let fitted = fit(text, inner_w);
+        if cursor == Some(i) {
+            write!(stdout, "{ORANGE}│{RESET}{HILITE} {color}{fitted} {RESET}{ORANGE}│{RESET}")?;
+        } else {
+            write!(stdout, "{ORANGE}│ {color}{fitted}{RESET} {ORANGE}│{RESET}")?;
+        }
+    }
+
+    let hint_row = row + 2 + lines.len() as u16;
+    execute!(stdout, cursor::MoveTo(col, hint_row))?;
+    write!(stdout, "{ORANGE}│{}│{RESET}", " ".repeat(inner_w + 2))?;
+    execute!(stdout, cursor::MoveTo(col, hint_row + 1))?;
+    let pad = inner_w.saturating_sub(hint.chars().count());
+    write!(stdout, "{ORANGE}│ {GRAY}{hint}{}{RESET} {ORANGE}│{RESET}", " ".repeat(pad))?;
+    execute!(stdout, cursor::MoveTo(col, hint_row + 2))?;
+    write!(stdout, "{ORANGE}└{}┘{RESET}", "─".repeat(inner_w + 2))?;
+
+    stdout.flush()?;
+    Ok(())
+}
+
+/// A modal single-line text editor. Returns `Some(value)` on Enter (value may be
+/// empty), `None` on Esc (cancelled — caller keeps the previous value).
+fn prompt_line(stdout: &mut impl Write, label: &str, initial: &str) -> anyhow::Result<Option<String>> {
+    let mut buf = initial.to_string();
+    loop {
+        let line = (WHITE, format!("{buf}_"));
+        draw_panel(stdout, label, std::slice::from_ref(&line), "Enter save   Esc cancel", None)?;
+        if event::poll(std::time::Duration::from_millis(200))? {
+            if let Event::Key(key) = event::read()? {
+                match (key.code, key.modifiers) {
+                    (KeyCode::Esc, _) => return Ok(None),
+                    (KeyCode::Enter, _) => return Ok(Some(buf)),
+                    (KeyCode::Backspace, _) => { buf.pop(); }
+                    (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+                        buf.push(c);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+/// A modal list editor: add (`a`), remove the selected entry (`d`/Del),
+/// navigate (↑↓). Esc commits and returns the edited list.
+fn edit_string_list(stdout: &mut impl Write, label: &str, mut items: Vec<String>) -> anyhow::Result<Vec<String>> {
+    let mut sel = 0usize;
+    loop {
+        let lines: Vec<(&'static str, String)> = if items.is_empty() {
+            vec![(GRAY, "(empty)".to_string())]
+        } else {
+            items.iter().map(|s| (WHITE, s.clone())).collect()
+        };
+        let cursor = if items.is_empty() { None } else { Some(sel.min(items.len() - 1)) };
+        draw_panel(stdout, label, &lines, "a add   d remove   ↑↓ move   Esc done", cursor)?;
+
+        if event::poll(std::time::Duration::from_millis(200))? {
+            if let Event::Key(key) = event::read()? {
+                match (key.code, key.modifiers) {
+                    (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::NONE) => return Ok(items),
+                    (KeyCode::Up, _) if !items.is_empty() => {
+                        sel = if sel == 0 { items.len() - 1 } else { sel - 1 };
+                    }
+                    (KeyCode::Down, _) if !items.is_empty() => {
+                        sel = (sel + 1) % items.len();
+                    }
+                    (KeyCode::Char('a'), KeyModifiers::NONE) => {
+                        if let Some(v) = prompt_line(stdout, "New entry", "")? {
+                            let v = v.trim().to_string();
+                            if !v.is_empty() {
+                                items.push(v);
+                                sel = items.len() - 1;
+                            }
+                        }
+                    }
+                    (KeyCode::Char('d'), KeyModifiers::NONE) | (KeyCode::Delete, _) if !items.is_empty() => {
+                        let i = sel.min(items.len() - 1);
+                        items.remove(i);
+                        if sel > 0 && sel >= items.len() { sel -= 1; }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+/// Confirm dialog. Returns true if the user pressed `y`.
+fn confirm_overlay(stdout: &mut impl Write, question: &str) -> anyhow::Result<bool> {
+    let line = (WHITE, question.to_string());
+    draw_panel(stdout, "confirm", std::slice::from_ref(&line), "y confirm   n / Esc cancel", None)?;
+    loop {
+        if event::poll(std::time::Duration::from_millis(200))? {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') => return Ok(true),
+                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => return Ok(false),
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+/// Editable fields of a provider detail view, in display order.
+enum Field {
+    Alias,
+    Enabled,
+    Module(usize),
+    Param(usize),
+    BrowseCommand,
+    BrowseArgs,
+}
+
+fn build_fields(schema: &[ConfigParam], modules: &[&str]) -> Vec<Field> {
+    let mut fields = Vec::new();
+    fields.push(Field::Alias);
+    fields.push(Field::Enabled);
+    for i in 0..modules.len() {
+        fields.push(Field::Module(i));
+    }
+    for i in 0..schema.len() {
+        fields.push(Field::Param(i));
+    }
+    fields.push(Field::BrowseCommand);
+    fields.push(Field::BrowseArgs);
+    fields
+}
+
+/// One rendered line per field: (color, "label: value"). Required string params
+/// that are unset render red. The raw stored value is shown (no env expansion),
+/// so `$TOKEN` stays `$TOKEN` while editing.
+fn field_line(entry: &ProviderEntry, schema: &[ConfigParam], modules: &[&str], field: &Field) -> (&'static str, String) {
+    let pad = "browse args".len(); // widest label, for alignment
+    let row = |label: &str, value: String| format!("{label:<pad$}  {value}");
+    match field {
+        Field::Alias => {
+            let v = entry.alias.clone().unwrap_or_else(|| "(none)".to_string());
+            (WHITE, row("alias", v))
+        }
+        Field::Enabled => {
+            let mark = if entry.enabled { "[x]" } else { "[ ]" };
+            (WHITE, row("enabled", mark.to_string()))
+        }
+        Field::Module(i) => {
+            let name = modules[*i];
+            let on = entry.is_module_enabled(name);
+            let mark = if on { "[x]" } else { "[ ]" };
+            (WHITE, row(&format!("module {name}"), mark.to_string()))
+        }
+        Field::Param(i) => {
+            let p = &schema[*i];
+            let raw = entry.config.get(p.name).and_then(|v| v.as_str()).map(str::to_string);
+            match p.kind {
+                ConfigParamKind::String => match raw {
+                    Some(v) => (WHITE, row(p.name, v)),
+                    None if p.required => (RED, row(p.name, "✗ required".to_string())),
+                    None => (GRAY, row(p.name, "(unset)".to_string())),
+                },
+                ConfigParamKind::List => {
+                    let n = entry.get_list(p.name).len();
+                    let color = if p.required && n == 0 { RED } else { WHITE };
+                    (color, row(p.name, format!("[{n} item{}]", if n == 1 { "" } else { "s" })))
+                }
+            }
+        }
+        Field::BrowseCommand => {
+            let v = entry.browse.as_ref().map(|b| b.command.clone()).unwrap_or_else(|| "(none)".to_string());
+            (WHITE, row("browse cmd", v))
+        }
+        Field::BrowseArgs => {
+            let n = entry.browse.as_ref().map(|b| b.args.len()).unwrap_or(0);
+            (WHITE, row("browse args", format!("[{n} item{}]", if n == 1 { "" } else { "s" })))
+        }
+    }
+}
+
+/// Edit one provider entry in `cfg`. Saves to disk after each mutation and
+/// returns whether anything changed.
+fn edit_provider_detail(stdout: &mut impl Write, root: &Path, cfg: &mut ProjectConfig, idx: usize) -> anyhow::Result<bool> {
+    let name = cfg.providers[idx].name.clone();
+    let schema = provider_schema(&name);
+    let modules = provider_modules(&name);
+    let fields = build_fields(&schema, &modules);
+
+    let mut sel = 0usize;
+    let mut changed = false;
+
+    loop {
+        let entry = &cfg.providers[idx];
+        let mut lines: Vec<(&'static str, String)> =
+            fields.iter().map(|f| field_line(entry, &schema, &modules, f)).collect();
+
+        let issues = entry_issues(entry);
+        if !issues.is_empty() {
+            lines.push((GRAY, String::new()));
+            lines.push((RED, format!("⚠ {} issue{}", issues.len(), if issues.len() == 1 { "" } else { "s" })));
+        }
+
+        let title = match &entry.alias {
+            Some(a) => format!("{name} ({a})"),
+            None => name.clone(),
+        };
+        draw_panel(stdout, &title, &lines, "↑↓ move   Enter edit/toggle   Esc back", Some(sel))?;
+
+        if event::poll(std::time::Duration::from_millis(200))? {
+            if let Event::Key(key) = event::read()? {
+                match (key.code, key.modifiers) {
+                    (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::NONE) => break,
+                    (KeyCode::Up, _) => { sel = if sel == 0 { fields.len() - 1 } else { sel - 1 }; }
+                    (KeyCode::Down, _) => { sel = (sel + 1) % fields.len(); }
+                    (KeyCode::Enter, _) => {
+                        if apply_field(stdout, &mut cfg.providers[idx], &schema, &modules, &fields[sel])? {
+                            config::save(root, cfg)?;
+                            changed = true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(changed)
+}
+
+/// Run the edit action for the selected field, mutating `entry`. Returns whether
+/// the entry was modified.
+fn apply_field(
+    stdout: &mut impl Write,
+    entry: &mut ProviderEntry,
+    schema: &[ConfigParam],
+    modules: &[&str],
+    field: &Field,
+) -> anyhow::Result<bool> {
+    match field {
+        Field::Alias => {
+            let cur = entry.alias.clone().unwrap_or_default();
+            if let Some(v) = prompt_line(stdout, "alias", &cur)? {
+                let v = v.trim().to_string();
+                entry.alias = if v.is_empty() { None } else { Some(v) };
+                return Ok(true);
+            }
+        }
+        Field::Enabled => {
+            entry.enabled = !entry.enabled;
+            return Ok(true);
+        }
+        Field::Module(i) => {
+            let name = modules[*i].to_string();
+            if let Some(pos) = entry.disabled_modules.iter().position(|m| *m == name) {
+                entry.disabled_modules.remove(pos);
+            } else {
+                entry.disabled_modules.push(name);
+            }
+            return Ok(true);
+        }
+        Field::Param(i) => {
+            let p = &schema[*i];
+            match p.kind {
+                ConfigParamKind::String => {
+                    let cur = entry.config.get(p.name).and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    if let Some(v) = prompt_line(stdout, p.name, &cur)? {
+                        let v = v.trim().to_string();
+                        if v.is_empty() {
+                            entry.config.remove(p.name);
+                        } else {
+                            entry.config.insert(p.name.to_string(), serde_yaml::Value::String(v));
+                        }
+                        return Ok(true);
+                    }
+                }
+                ConfigParamKind::List => {
+                    let cur = entry.get_list(p.name);
+                    let updated = edit_string_list(stdout, p.name, cur)?;
+                    if updated.is_empty() {
+                        entry.config.remove(p.name);
+                    } else {
+                        let seq = updated.into_iter().map(serde_yaml::Value::String).collect();
+                        entry.config.insert(p.name.to_string(), serde_yaml::Value::Sequence(seq));
+                    }
+                    return Ok(true);
+                }
+            }
+        }
+        Field::BrowseCommand => {
+            let cur = entry.browse.as_ref().map(|b| b.command.clone()).unwrap_or_default();
+            if let Some(v) = prompt_line(stdout, "browse cmd", &cur)? {
+                let v = v.trim().to_string();
+                if v.is_empty() {
+                    entry.browse = None;
+                } else {
+                    match &mut entry.browse {
+                        Some(b) => b.command = v,
+                        None => entry.browse = Some(BrowseConfig { command: v, args: Vec::new() }),
+                    }
+                }
+                return Ok(true);
+            }
+        }
+        Field::BrowseArgs => {
+            // Args are meaningless without a command, so only editable once a
+            // browse command is set.
+            let Some(b) = &mut entry.browse else { return Ok(false) };
+            b.args = edit_string_list(stdout, "browse args", b.args.clone())?;
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Edit the project-level `browse` block (the "General" detail view).
+fn edit_general_detail(stdout: &mut impl Write, root: &Path, cfg: &mut ProjectConfig) -> anyhow::Result<bool> {
+    let mut sel = 0usize;
+    let mut changed = false;
+    loop {
+        let cmd = cfg.browse.as_ref().map(|b| b.command.clone()).unwrap_or_else(|| "(none)".to_string());
+        let nargs = cfg.browse.as_ref().map(|b| b.args.len()).unwrap_or(0);
+        let lines = vec![
+            (WHITE, format!("{:<11}  {}", "browse cmd", cmd)),
+            (WHITE, format!("{:<11}  [{} item{}]", "browse args", nargs, if nargs == 1 { "" } else { "s" })),
+        ];
+        draw_panel(stdout, "General", &lines, "↑↓ move   Enter edit   Esc back", Some(sel))?;
+
+        if event::poll(std::time::Duration::from_millis(200))? {
+            if let Event::Key(key) = event::read()? {
+                match (key.code, key.modifiers) {
+                    (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::NONE) => break,
+                    (KeyCode::Up, _) | (KeyCode::Down, _) => { sel = 1 - sel; }
+                    (KeyCode::Enter, _) if sel == 0 => {
+                        let cur = cfg.browse.as_ref().map(|b| b.command.clone()).unwrap_or_default();
+                        if let Some(v) = prompt_line(stdout, "browse cmd", &cur)? {
+                            let v = v.trim().to_string();
+                            if v.is_empty() {
+                                cfg.browse = None;
+                            } else {
+                                match &mut cfg.browse {
+                                    Some(b) => b.command = v,
+                                    None => cfg.browse = Some(BrowseConfig { command: v, args: Vec::new() }),
+                                }
+                            }
+                            config::save(root, cfg)?;
+                            changed = true;
+                        }
+                    }
+                    (KeyCode::Enter, _) => {
+                        let cur = cfg.browse.as_ref().map(|b| b.args.clone()).unwrap_or_default();
+                        let updated = edit_string_list(stdout, "browse args", cur)?;
+                        if let Some(b) = &mut cfg.browse {
+                            b.args = updated;
+                            config::save(root, cfg)?;
+                            changed = true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    Ok(changed)
+}
+
+/// Master list of the config editor: "General" plus one row per provider.
+/// Returns whether the config changed (so the caller can rebuild context).
+fn show_config_editor(stdout: &mut impl Write, root: &Path) -> anyhow::Result<bool> {
+    let mut cfg = config::load(root)?;
+    let mut changed = false;
+    let mut sel = 0usize; // 0 = General, 1.. = providers[sel-1]
+
+    loop {
+        let mut lines: Vec<(&'static str, String)> = Vec::new();
+        lines.push((WHITE, "General".to_string()));
+        for entry in &cfg.providers {
+            let label = match &entry.alias {
+                Some(a) => format!("{} ({})", entry.name, a),
+                None => entry.name.clone(),
+            };
+            let mut status = String::new();
+            if !entry.enabled {
+                status.push_str("  ✗ off");
+            }
+            let issues = entry_issues(entry);
+            if !issues.is_empty() {
+                status.push_str(&format!("  ⚠ {}", issues.len()));
+            }
+            let color = if !issues.is_empty() { RED } else { WHITE };
+            lines.push((color, format!("{label}{status}")));
+        }
+
+        let n = lines.len();
+        draw_panel(stdout, "config", &lines, "↑↓ move   Enter open   a add   x delete   Esc close", Some(sel))?;
+
+        if event::poll(std::time::Duration::from_millis(200))? {
+            if let Event::Key(key) = event::read()? {
+                match (key.code, key.modifiers) {
+                    (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::NONE) => break,
+                    (KeyCode::Up, _) => { sel = if sel == 0 { n - 1 } else { sel - 1 }; }
+                    (KeyCode::Down, _) => { sel = (sel + 1) % n; }
+                    (KeyCode::Enter, _) => {
+                        if sel == 0 {
+                            changed |= edit_general_detail(stdout, root, &mut cfg)?;
+                        } else {
+                            changed |= edit_provider_detail(stdout, root, &mut cfg, sel - 1)?;
+                        }
+                    }
+                    (KeyCode::Char('a'), KeyModifiers::NONE) => {
+                        // `provider_add` uses dialoguer (cooked mode) and writes
+                        // to disk itself, so drop out of the alternate screen
+                        // around it, then reload to pick up the new entry.
+                        execute!(stdout, cursor::Show, LeaveAlternateScreen)?;
+                        terminal::disable_raw_mode()?;
+                        let res = crate::provider_add(root);
+                        terminal::enable_raw_mode()?;
+                        execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
+                        if res.is_ok() {
+                            cfg = config::load(root)?;
+                            changed = true;
+                            sel = sel.min(cfg.providers.len());
+                        }
+                    }
+                    (KeyCode::Char('x'), KeyModifiers::NONE) | (KeyCode::Delete, _) if sel > 0 => {
+                        let entry = &cfg.providers[sel - 1];
+                        if entry.name == "local" {
+                            // The local provider is the on-disk base; never removable.
+                        } else {
+                            let q = format!("Remove provider '{}'? (config only; files stay on disk)", entry.display_name());
+                            if confirm_overlay(stdout, &q)? {
+                                cfg.providers.remove(sel - 1);
+                                config::save(root, &cfg)?;
+                                changed = true;
+                                sel = sel.min(cfg.providers.len());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(changed)
+}
+
 // ── header helpers ───────────────────────────────────────────────────────────
 
 fn relative_time(ts: &str) -> Option<String> {
@@ -998,13 +1560,27 @@ fn format_size(bytes: u64) -> String {
 }
 
 fn enabled_providers(root: &Path) -> String {
-    let mut names = vec!["local".to_string()];
-    if let Ok(cfg) = crate::config::load(root) {
-        for p in &cfg.providers {
-            if p.enabled && p.name != "local" {
-                names.push(p.display_name().to_string());
-            }
+    let cfg = crate::config::load(root).unwrap_or_default();
+    // `local` is listed first when present and enabled. It's enabled unless an
+    // explicit local entry sets `enabled: false`; absence of any entry (a fresh
+    // or unconfigured project) still means local is on.
+    let local_on = cfg
+        .providers
+        .iter()
+        .find(|p| p.name == "local")
+        .map_or(true, |p| p.enabled);
+
+    let mut names = Vec::new();
+    if local_on {
+        names.push("local".to_string());
+    }
+    for p in &cfg.providers {
+        if p.enabled && p.name != "local" {
+            names.push(p.display_name().to_string());
         }
+    }
+    if names.is_empty() {
+        names.push("(none)".to_string());
     }
     names.join(", ")
 }
