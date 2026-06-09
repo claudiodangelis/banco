@@ -61,6 +61,20 @@ pub enum Commands {
     Browse,
     /// Check for extraneous content in the banco directory
     Check,
+    /// Report module data no longer backed by the configuration (intended for agents)
+    Tidy {
+        /// Limit the scan to a single module: repos, tasks, notes, or bookmarks
+        #[arg(long)]
+        module: Option<String>,
+        /// Pretty-print the JSON output
+        #[arg(long)]
+        pretty: bool,
+    },
+    /// Manage agent skills
+    Skills {
+        #[command(subcommand)]
+        action: SkillAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -68,5 +82,16 @@ pub enum ProviderAction {
     /// Add a new provider (interactive)
     Add,
     /// List configured providers
+    List,
+}
+
+#[derive(Subcommand)]
+pub enum SkillAction {
+    /// Install bundled skills for an agent (e.g. claude)
+    Install {
+        /// Target agent the skills are installed for
+        agent: String,
+    },
+    /// List installed and available skills
     List,
 }

@@ -4,9 +4,11 @@ mod context;
 mod module;
 mod provider;
 mod providers;
+mod skills;
 mod state;
 mod sync_state;
 mod template;
+mod tidy;
 mod tui;
 
 use std::collections::HashMap;
@@ -19,7 +21,7 @@ use clap::Parser;
 use clap::CommandFactory;
 use clap_complete::generate;
 
-use cli::{Cli, Commands, ProviderAction};
+use cli::{Cli, Commands, ProviderAction, SkillAction};
 use dialoguer::FuzzySelect;
 use module::BrowseItem;
 use context::{ContextOutput, ProviderContext};
@@ -506,6 +508,54 @@ fn run() -> anyhow::Result<()> {
                 std::process::exit(1);
             }
         }
+        Commands::Tidy { module, pretty } => {
+            if let Some(ref m) = module {
+                if !matches!(m.as_str(), "repos" | "tasks" | "notes" | "bookmarks") {
+                    anyhow::bail!("--module must be one of: repos, tasks, notes, bookmarks");
+                }
+            }
+            let report = tidy::report(&root, module.as_deref())?;
+            let json = if pretty {
+                serde_json::to_string_pretty(&report)?
+            } else {
+                serde_json::to_string(&report)?
+            };
+            println!("{}", json);
+        }
+        Commands::Skills { action } => match action {
+            SkillAction::Install { agent } => {
+                let installed = skills::install(&root, &agent)?;
+                let dir = skills::skills_dir(&agent).unwrap();
+                for name in &installed {
+                    println!("Installed skill '{}' to {}/{}", name, dir, name);
+                }
+            }
+            SkillAction::List => {
+                let agent = "claude";
+                let installed = skills::installed(&root, agent);
+                println!("Installed ({}):", agent);
+                if installed.is_empty() {
+                    println!("  (none)");
+                } else {
+                    for name in &installed {
+                        println!("  {name}");
+                    }
+                }
+                let available: Vec<&str> = skills::BUNDLED
+                    .iter()
+                    .map(|s| s.name)
+                    .filter(|n| !installed.iter().any(|i| i == n))
+                    .collect();
+                println!("Available to install:");
+                if available.is_empty() {
+                    println!("  (none)");
+                } else {
+                    for name in &available {
+                        println!("  {name}");
+                    }
+                }
+            }
+        },
     }
 
     Ok(())

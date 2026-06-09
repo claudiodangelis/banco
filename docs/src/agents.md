@@ -17,6 +17,13 @@ Banco supports agentic workflows. Upon initialization, three files are created f
 - Use `status` and `tags` metadata on synced provider items to make informed decisions — e.g.
   prioritize open issues, filter by label, skip closed tasks when working on active work
 
+## Skills
+
+Banco can install agent skills into a project with `banco skills install <agent>`. For the
+`claude` agent, skills are written to `.claude/skills/<skill-name>/SKILL.md` — the location
+Claude Code discovers project skills from — so they become invokable immediately. See the
+[skills command](commands/skills.md) for details.
+
 ## Example prompts
 
 - How many tasks do I have in the backlog?
