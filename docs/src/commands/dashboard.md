@@ -40,9 +40,25 @@ The top row shows:
 Each provider with at least one non-empty module gets a box. Modules with zero items are
 hidden. Each visible module is a column:
 
-- **notes / bookmarks / repos** — header with item count, then up to 5 most recent names
+- **notes / bookmarks** — header with item count, then up to 5 most recent names
+- **repos** — like notes/bookmarks, but each repo also shows its current git branch and
+  status, e.g. `my-repo (main) *↟2` (see [Repo status indicators](#repo-status-indicators))
 - **tasks** — header with total count, then items grouped by status with up to 5 items per
   group; task number prefixes are stripped from displayed names
+
+#### Repo status indicators
+
+Repos render as `name (branch) flags`, where the flags annotate the git working copy:
+
+| Marker | Meaning |
+|---|---|
+| `(branch)` | Current branch. Omitted for a detached `HEAD` or a directory git can't read |
+| `*` | The working copy has uncommitted or untracked changes |
+| `↟N` | N local branches are not merged into the current branch |
+
+A clean repo on its default branch shows just `name (main)` with no flags. The same branch,
+dirtiness, and unmerged-branch information is available in [`banco context`](context.md) JSON
+output and in [`banco tidy`](tidy.md) repo findings.
 
 If the terminal is too narrow to show item details usefully (less than 16 characters per
 column), the columns collapse to headers-only — counts remain visible.

@@ -46,7 +46,12 @@ non-empty field:
 - `untracked_files: N` — N files git isn't tracking
 - `unpushed_commits: N` — N commits not on any remote (would be lost)
 - `local_only_branches: [...]` — branches with no upstream (may be unique work)
+- `unmerged_branches: N` — N local branches not merged into the current branch
 - `stashes: N` — N stash entries
+
+`branch` (current branch) and `unmerged_branches` are context for the decision,
+not safety gates — they don't affect `safe_to_remove`, but a repo sitting on a
+feature branch or with unmerged work is worth mentioning before removal.
 
 If `git.error` is set, git couldn't be inspected — treat the repo as unsafe and
 tell the user why.

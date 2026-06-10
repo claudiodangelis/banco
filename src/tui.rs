@@ -1580,6 +1580,30 @@ fn fit(s: &str, width: usize) -> String {
     }
 }
 
+/// Build a repos item's display label: `name (branch) *↟N`, where `*` flags an
+/// uncommitted working copy and `↟N` counts branches not merged into HEAD. Items
+/// without a branch (non-repo modules, detached HEAD) render as the bare name.
+fn repo_item_label(item: &serde_json::Value, name: &str) -> String {
+    let Some(branch) = item.get("branch").and_then(|v| v.as_str()).filter(|b| !b.is_empty()) else {
+        return name.to_string();
+    };
+    let dirty = item.get("dirty").and_then(|v| v.as_bool()).unwrap_or(false);
+    let unmerged = item.get("unmerged_branches").and_then(|v| v.as_u64()).unwrap_or(0);
+
+    let mut flags = String::new();
+    if dirty {
+        flags.push('*');
+    }
+    if unmerged > 0 {
+        flags.push_str(&format!("↟{unmerged}"));
+    }
+    if flags.is_empty() {
+        format!("{name} ({branch})")
+    } else {
+        format!("{name} ({branch}) {flags}")
+    }
+}
+
 fn module_column_lines(module: &ModuleContext) -> Vec<ColumnLine> {
     let mut lines = vec![
         ColumnLine::Header(format!("{} ({})", module.name, module.items.len())),
@@ -1646,7 +1670,7 @@ fn module_column_lines(module: &ModuleContext) -> Vec<ColumnLine> {
     } else {
         for item in &module.items {
             if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
-                lines.push(ColumnLine::Item(format!("  {name}")));
+                lines.push(ColumnLine::Item(format!("  {}", repo_item_label(item, name))));
             }
         }
     }

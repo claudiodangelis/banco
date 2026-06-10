@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::context::Label;
 use crate::module::Module;
@@ -89,7 +89,7 @@ impl Module for GitHubRepos {
                     .and_then(|s| s.to_str())
                     .unwrap_or("")
                     .to_string();
-                items.push(json!({ "name": name }));
+                items.push(crate::providers::git::repo_item(name, &path));
             }
         }
         Ok(items)

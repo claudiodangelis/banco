@@ -41,8 +41,10 @@ Each synced repository directory that no longer matches the configuration, with 
   "path": "repos/github/old-service",
   "reason": "removed_from_config",
   "git": {
+    "branch": "main",
     "uncommitted_changes": false,
     "untracked_files": 2,
+    "unmerged_branches": 1,
     "unpushed_commits": 1,
     "local_only_branches": ["spike"],
     "stashes": 0,
@@ -63,6 +65,11 @@ Each synced repository directory that no longer matches the configuration, with 
 `safe_to_remove` is `true` only when the working copy holds nothing that would be lost. When git
 cannot be inspected (e.g. not a git repository), a `git.error` field is set and `safe_to_remove`
 stays `false`.
+
+`branch` (current branch, omitted for a detached `HEAD`) and `unmerged_branches` (local branches
+not merged into the current branch) are decision context rather than safety gates — they do not
+affect `safe_to_remove`, but a repo on a feature branch or with unmerged work is worth a mention
+before removal.
 
 ### tasks
 
