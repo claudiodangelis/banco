@@ -1,7 +1,115 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 use serde::Serialize;
+
+/// Default number of concurrent git clone/fetch operations. Repo syncing is
+/// network-bound (transfer + remote server), not CPU-bound, so this is a small
+/// fixed value rather than something derived from core count: going wider mainly
+/// risks tripping remote connection/rate limits and splitting the same pipe.
+pub const DEFAULT_SYNC_JOBS: usize = 6;
+
+enum Outcome {
+    Cloned,
+    Fetched,
+    /// `git fetch` failed for an existing repo — non-fatal, reported as a warning.
+    FetchWarning(String),
+    /// Resolve or clone failed — fatal; the overall sync returns an error.
+    Failed(String),
+}
+
+/// Clone (or fetch, if already present) a set of repositories in parallel.
+///
+/// `resolve` maps a project identifier to its `(ssh_url, destination)`; it runs
+/// inside the worker threads so per-repo API lookups are parallelized too. Output
+/// from the underlying git processes is captured and discarded — only a final
+/// summary is printed. Returns an error if any repo failed to resolve or clone;
+/// fetch failures on existing repos are reported as warnings but not fatal.
+pub fn sync_repos<F>(
+    projects: &[String],
+    repos_root: &Path,
+    concurrency: usize,
+    resolve: F,
+) -> anyhow::Result<()>
+where
+    F: Fn(&str) -> anyhow::Result<(String, PathBuf)> + Sync,
+{
+    if projects.is_empty() {
+        return Ok(());
+    }
+    std::fs::create_dir_all(repos_root)?;
+
+    let workers = concurrency.clamp(1, projects.len());
+    let next = AtomicUsize::new(0);
+    let outcomes: Mutex<Vec<Outcome>> = Mutex::new(Vec::with_capacity(projects.len()));
+
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| loop {
+                let i = next.fetch_add(1, Ordering::Relaxed);
+                if i >= projects.len() {
+                    break;
+                }
+                let label = &projects[i];
+                let outcome = match resolve(label) {
+                    Ok((ssh_url, dest)) => clone_or_fetch(label, &ssh_url, &dest),
+                    Err(e) => Outcome::Failed(format!("{}: {}", label, e)),
+                };
+                outcomes.lock().unwrap().push(outcome);
+            });
+        }
+    });
+
+    let outcomes = outcomes.into_inner().unwrap();
+    let mut cloned = 0usize;
+    let mut fetched = 0usize;
+    let mut warnings = Vec::new();
+    let mut failures = Vec::new();
+    for outcome in outcomes {
+        match outcome {
+            Outcome::Cloned => cloned += 1,
+            Outcome::Fetched => fetched += 1,
+            Outcome::FetchWarning(m) => warnings.push(m),
+            Outcome::Failed(m) => failures.push(m),
+        }
+    }
+
+    println!("  repos: {} cloned, {} updated", cloned, fetched);
+    for w in &warnings {
+        eprintln!("  warning: git fetch failed for {}", w);
+    }
+    if !failures.is_empty() {
+        anyhow::bail!("git clone failed for {} repo(s):\n  {}", failures.len(), failures.join("\n  "));
+    }
+    Ok(())
+}
+
+fn clone_or_fetch(label: &str, ssh_url: &str, dest: &Path) -> Outcome {
+    if dest.exists() {
+        match Command::new("git")
+            .args(["-C", dest.to_str().unwrap(), "fetch", "--all", "--prune"])
+            .output()
+        {
+            Ok(o) if o.status.success() => Outcome::Fetched,
+            _ => Outcome::FetchWarning(label.to_string()),
+        }
+    } else {
+        match Command::new("git")
+            .args(["clone", ssh_url, dest.to_str().unwrap()])
+            .output()
+        {
+            Ok(o) if o.status.success() => Outcome::Cloned,
+            Ok(o) => Outcome::Failed(format!(
+                "{}: {}",
+                label,
+                String::from_utf8_lossy(&o.stderr).trim()
+            )),
+            Err(e) => Outcome::Failed(format!("{}: {}", label, e)),
+        }
+    }
+}
 
 /// Safety summary of a git working copy, used by `banco tidy` to warn the user
 /// before a no-longer-synced repository is removed. Every field errs toward

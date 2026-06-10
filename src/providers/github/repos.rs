@@ -13,31 +13,11 @@ pub struct GitHubRepos {
 }
 
 impl GitHubRepos {
-    pub fn sync(&self, client: &GitHubClient, projects: &[String]) -> anyhow::Result<()> {
-        for owner_repo in projects {
+    pub fn sync(&self, client: &GitHubClient, projects: &[String], jobs: usize) -> anyhow::Result<()> {
+        crate::providers::git::sync_repos(projects, &self.repos_root, jobs, |owner_repo| {
             let repo = client.repo(owner_repo)?;
-            let dest = self.repos_root.join(&repo.name);
-
-            if dest.exists() {
-                println!("  fetching {}", owner_repo);
-                let status = std::process::Command::new("git")
-                    .args(["-C", dest.to_str().unwrap(), "fetch", "--all", "--prune"])
-                    .status()?;
-                if !status.success() {
-                    eprintln!("  warning: git fetch failed for {}", owner_repo);
-                }
-            } else {
-                println!("  cloning {}", owner_repo);
-                std::fs::create_dir_all(&self.repos_root)?;
-                let status = std::process::Command::new("git")
-                    .args(["clone", &repo.ssh_url, dest.to_str().unwrap()])
-                    .status()?;
-                if !status.success() {
-                    anyhow::bail!("git clone failed for {}", owner_repo);
-                }
-            }
-        }
-        Ok(())
+            Ok((repo.ssh_url, self.repos_root.join(&repo.name)))
+        })
     }
 }
 

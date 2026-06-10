@@ -51,6 +51,9 @@ pub enum Commands {
         /// Only sync projects whose path matches this regex
         #[arg(long)]
         pattern: Option<String>,
+        /// Number of concurrent git clone/fetch operations
+        #[arg(long, short)]
+        jobs: Option<usize>,
     },
     /// Generate shell completion scripts
     Completions {

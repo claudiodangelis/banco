@@ -266,7 +266,7 @@ impl Provider for GitHubProvider {
         }
 
         if sync_repos && !projects.is_empty() {
-            self.github_repos(root).sync(&client, &projects)?;
+            self.github_repos(root).sync(&client, &projects, opts.jobs)?;
         }
 
         sync_state::write(root, self.entry.display_name(), &synced_at)?;

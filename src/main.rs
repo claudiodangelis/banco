@@ -441,7 +441,7 @@ fn run() -> anyhow::Result<()> {
             };
             println!("{}", json);
         }
-        Commands::Sync { provider, module, pattern } => {
+        Commands::Sync { provider, module, pattern, jobs } => {
             let providers = remote_providers(&root)?;
             if providers.is_empty() {
                 anyhow::bail!("no providers configured; run `banco provider add` first");
@@ -458,7 +458,8 @@ fn run() -> anyhow::Result<()> {
                     anyhow::bail!("--module must be 'tasks' or 'repos'");
                 }
             }
-            let opts = SyncOpts { module, pattern };
+            let jobs = jobs.unwrap_or(providers::git::DEFAULT_SYNC_JOBS).max(1);
+            let opts = SyncOpts { module, pattern, jobs };
             sync_state::ensure_dir(&root)?;
             for p in to_sync {
                 println!("Syncing {}...", p.name());

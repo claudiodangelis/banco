@@ -18,6 +18,8 @@ pub enum ConfigParamKind {
 pub struct SyncOpts {
     pub module: Option<String>,
     pub pattern: Option<String>,
+    /// Number of concurrent git clone/fetch operations.
+    pub jobs: usize,
 }
 
 pub trait Provider {
