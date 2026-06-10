@@ -8,10 +8,15 @@ use serde::Serialize;
 /// caution: when git can't be queried, the repo is reported as not safe.
 #[derive(Serialize, Default)]
 pub struct RepoState {
+    /// Current branch, or `None` for detached HEAD / unqueryable repo.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
     /// Tracked files with staged or unstaged modifications.
     pub uncommitted_changes: bool,
     /// Number of untracked files (excluding ignored).
     pub untracked_files: usize,
+    /// Local branches not merged into the current branch.
+    pub unmerged_branches: usize,
     /// Commits on local branches not present on any remote.
     pub unpushed_commits: usize,
     /// Local branches with no upstream — work that may exist only here.
@@ -91,6 +96,10 @@ pub fn inspect_repo(repo_path: &Path) -> RepoState {
         .map(|l| l.len())
         .unwrap_or(0);
 
+    let unmerged_branches = git_lines(repo_path, &["branch", "--no-merged"])
+        .map(|l| l.len())
+        .unwrap_or(0);
+
     let safe_to_remove = !uncommitted_changes
         && untracked_files == 0
         && unpushed_commits == 0
@@ -98,14 +107,69 @@ pub fn inspect_repo(repo_path: &Path) -> RepoState {
         && stashes == 0;
 
     RepoState {
+        branch: current_branch(repo_path),
         uncommitted_changes,
         untracked_files,
+        unmerged_branches,
         unpushed_commits,
         local_only_branches,
         stashes,
         safe_to_remove,
         error: None,
     }
+}
+
+/// Current branch name of a git working copy, or `None` when the path is not a
+/// git repo, git can't be queried, or HEAD is detached.
+pub fn current_branch(repo_path: &Path) -> Option<String> {
+    let branch = git_lines(repo_path, &["rev-parse", "--abbrev-ref", "HEAD"])?
+        .pop()?;
+    if branch == "HEAD" {
+        None
+    } else {
+        Some(branch)
+    }
+}
+
+/// Lightweight branch/dirtiness summary used to annotate repos in the dashboard.
+pub struct RepoStatus {
+    /// Current branch, or `None` for detached HEAD / unqueryable repo.
+    pub branch: Option<String>,
+    /// True when the working copy has staged, unstaged, or untracked changes.
+    pub dirty: bool,
+    /// Local branches not merged into the current branch.
+    pub unmerged_branches: usize,
+}
+
+/// Build a repos-module context item annotated with the working copy's branch,
+/// dirtiness, and unmerged-branch count. Shared by every provider's repos module.
+pub fn repo_item(name: String, repo_path: &Path) -> serde_json::Value {
+    let status = repo_status(repo_path);
+    serde_json::json!({
+        "name": name,
+        "branch": status.as_ref().and_then(|s| s.branch.clone()),
+        "dirty": status.as_ref().map(|s| s.dirty).unwrap_or(false),
+        "unmerged_branches": status.as_ref().map(|s| s.unmerged_branches).unwrap_or(0),
+    })
+}
+
+/// Summarize a git working copy for display. Returns `None` when the path is not
+/// a git repository; individual git failures degrade gracefully to defaults.
+pub fn repo_status(repo_path: &Path) -> Option<RepoStatus> {
+    if !repo_path.join(".git").exists() {
+        return None;
+    }
+    let dirty = git_lines(repo_path, &["status", "--porcelain"])
+        .map(|l| !l.is_empty())
+        .unwrap_or(false);
+    let unmerged_branches = git_lines(repo_path, &["branch", "--no-merged"])
+        .map(|l| l.len())
+        .unwrap_or(0);
+    Some(RepoStatus {
+        branch: current_branch(repo_path),
+        dirty,
+        unmerged_branches,
+    })
 }
 
 pub fn read_git_remote_url(repo_path: &Path) -> Option<String> {

@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::context::Label;
 use crate::module::{ItemKind, Module};
+use crate::providers::git::repo_item;
 
 pub struct Repos;
 
@@ -67,7 +68,7 @@ those may be a better fit for repositories hosted on a remote platform.\
             let path = entry?.path();
             if path.is_dir() {
                 let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-                items.push(json!({ "name": name }));
+                items.push(repo_item(name, &path));
             }
         }
         Ok(items)
