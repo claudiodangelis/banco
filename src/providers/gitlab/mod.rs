@@ -255,7 +255,7 @@ impl Provider for GitLabProvider {
         }
 
         if sync_repos && !projects.is_empty() {
-            self.gitlab_repos(root).sync(&client, &projects)?;
+            self.gitlab_repos(root).sync(&client, &projects, opts.jobs)?;
         }
 
         sync_state::write(root, self.entry.display_name(), &synced_at)?;

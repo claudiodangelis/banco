@@ -8,6 +8,7 @@ banco sync <name>                              # sync a specific provider by nam
 banco sync <name> --module tasks               # sync only the tasks module
 banco sync <name> --module repos               # sync only the repos module
 banco sync <name> --pattern "myorg/frontend"   # sync only projects matching regex
+banco sync <name> --jobs 10                     # clone/fetch up to 10 repos at once
 ```
 
 `--module` and `--pattern` can be combined: `banco sync github --module tasks --pattern "myorg/.*"`.
@@ -20,6 +21,7 @@ Sync is non-destructive: it never deletes or overwrites existing files.
 | --- | --- |
 | `--module <tasks\|repos>` | Limit sync to a single module; skips the other. Useful when you only want to fetch issues without cloning repos, or vice versa. |
 | `--pattern <regex>` | Only sync projects whose path (`owner/repo` for GitHub/GitLab) matches this regex. Applied on top of the project list already defined in the provider config. Not applicable to Jira. |
+| `--jobs <n>`, `-j <n>` | Number of repos to clone/fetch concurrently. Defaults to `6`. Repo syncing is network-bound, so this is a small fixed value rather than something derived from CPU cores — raising it mainly risks tripping the remote's connection or rate limits. |
 
 ## Sync state
 
@@ -52,3 +54,8 @@ marked done/closed — it was completed on the remote and simply disappeared fro
 | -------------------- | ------------------------------ |
 | Repo not yet on disk | Clones via SSH                 |
 | Repo already on disk | Runs `git fetch --all --prune` |
+
+Within a provider, repos are cloned/fetched in parallel (see `--jobs`); git's own
+progress output is suppressed in favour of a single summary line. A failed clone
+aborts the sync; a failed fetch on an existing repo is reported as a warning and
+does not stop the run.

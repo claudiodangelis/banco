@@ -17,31 +17,11 @@ fn repo_name(namespace_repo: &str) -> &str {
 }
 
 impl GitLabRepos {
-    pub fn sync(&self, client: &GitLabClient, projects: &[String]) -> anyhow::Result<()> {
-        for namespace_project in projects {
+    pub fn sync(&self, client: &GitLabClient, projects: &[String], jobs: usize) -> anyhow::Result<()> {
+        crate::providers::git::sync_repos(projects, &self.repos_root, jobs, |namespace_project| {
             let project = client.project(namespace_project)?;
-            let dest = self.repos_root.join(repo_name(namespace_project));
-
-            if dest.exists() {
-                println!("  fetching {}", namespace_project);
-                let status = std::process::Command::new("git")
-                    .args(["-C", dest.to_str().unwrap(), "fetch", "--all", "--prune"])
-                    .status()?;
-                if !status.success() {
-                    eprintln!("  warning: git fetch failed for {}", namespace_project);
-                }
-            } else {
-                println!("  cloning {}", namespace_project);
-                std::fs::create_dir_all(&self.repos_root)?;
-                let status = std::process::Command::new("git")
-                    .args(["clone", &project.ssh_url_to_repo, dest.to_str().unwrap()])
-                    .status()?;
-                if !status.success() {
-                    anyhow::bail!("git clone failed for {}", namespace_project);
-                }
-            }
-        }
-        Ok(())
+            Ok((project.ssh_url_to_repo, self.repos_root.join(repo_name(namespace_project))))
+        })
     }
 }
 
