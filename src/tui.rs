@@ -65,6 +65,7 @@ const WHITE: &str = "\x1b[97m";
 const GREEN: &str = "\x1b[32m";
 const RED: &str = "\x1b[31m";
 const RESET: &str = "\x1b[0m";
+const LIGHT_GREEN: &str = "\x1b[38;2;134;239;172m";
 
 // ── dashboard ────────────────────────────────────────────────────────────────
 
@@ -643,7 +644,7 @@ fn render_item_list(
             write!(stdout, "{ORANGE}│ {color}{text} {ORANGE}│{RESET}\r\n")?;
         } else if is_selected {
             let text = fit(&format!("  {}", row.display), inner_w);
-            write!(stdout, "{ORANGE}│{RESET}\x1b[48;2;60;40;10m{ORANGE}{text} {RESET}{ORANGE}│{RESET}\r\n")?;
+            write!(stdout, "{ORANGE}│{RESET}\x1b[48;2;60;40;10m{ORANGE} {text} {RESET}{ORANGE}│{RESET}\r\n")?;
         } else {
             let text = fit(&format!("  {}", row.display), inner_w);
             write!(stdout, "{ORANGE}│ {GRAY}{text}{RESET} {ORANGE}│{RESET}\r\n")?;
@@ -1718,8 +1719,8 @@ fn render_collapsed_section(
     term_width: usize,
     focused: bool,
 ) -> anyhow::Result<()> {
-    let border = if focused { ORANGE } else { GRAY };
-    let name_color = if focused { ORANGE } else { WHITE };
+    let border = if focused { LIGHT_GREEN } else { GRAY };
+    let name_color = if focused { LIGHT_GREEN } else { WHITE };
 
     let summary = modules.iter()
         .map(|m| format!("{} ({})", m.name, m.items.len()))
@@ -1785,7 +1786,7 @@ fn render_provider_section(
 
     let max_rows = columns.iter().map(|c| c.len()).max().unwrap_or(0);
 
-    let border = if focused_col.is_some() { ORANGE } else { GRAY };
+    let border = if focused_col.is_some() { LIGHT_GREEN } else { GRAY };
 
     // Top border: provider name embedded in first column's segment
     let name_str = format!(" {} ", provider.name);
@@ -1811,7 +1812,7 @@ fn render_provider_section(
             let (color, text) = match col.get(row) {
                 None => (GRAY, String::new()),
                 Some(ColumnLine::Header(s)) => {
-                    let c = if focused_col == Some(ci) { ORANGE } else { WHITE };
+                    let c = if focused_col == Some(ci) { LIGHT_GREEN } else { WHITE };
                     (c, s.clone())
                 }
                 Some(ColumnLine::Group(s)) => (WHITE, s.clone()),
