@@ -75,8 +75,9 @@ pub fn fetch_issues(
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     let inner = extract_result(&stdout).unwrap_or_else(|| stdout.to_string());
+    let inner = strip_code_fences(&inner);
 
-    serde_json::from_str(&inner).map_err(|e| {
+    serde_json::from_str(inner).map_err(|e| {
         anyhow::anyhow!(
             "failed to parse claude output as JSON: {}\nRaw output:\n{}",
             e,
@@ -93,4 +94,19 @@ fn extract_result(raw: &str) -> Option<String> {
         result: String,
     }
     serde_json::from_str::<Envelope>(raw).ok().map(|e| e.result)
+}
+
+/// Strips a leading/trailing markdown code fence (```json ... ```), which
+/// `claude` emits non-deterministically even when asked for raw JSON.
+fn strip_code_fences(s: &str) -> &str {
+    let t = s.trim();
+    let Some(t) = t.strip_prefix("```") else {
+        return t;
+    };
+    // Drop the optional language tag on the opening fence's line.
+    let t = match t.split_once('\n') {
+        Some((_lang, rest)) => rest,
+        None => t,
+    };
+    t.trim().strip_suffix("```").unwrap_or(t).trim()
 }
