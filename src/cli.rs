@@ -62,6 +62,18 @@ pub enum Commands {
     },
     /// Browse bookmarks with a fuzzy finder and open in the default browser
     Browse,
+    /// Serve a read-only web interface for the project
+    Serve {
+        /// Port to bind to
+        #[arg(long, default_value_t = 1985)]
+        port: u16,
+        /// Address to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        bind: String,
+        /// Do not open the browser automatically
+        #[arg(long)]
+        no_open: bool,
+    },
     /// Check for extraneous content in the banco directory
     Check,
     /// Report module data no longer backed by the configuration (intended for agents)

@@ -23,3 +23,5 @@ regex = "1.12.3"
 chrono = "0.4"
 sanitize-filename = "0.5"
 crossterm = "0.28"
+tiny_http = "0.12"
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }

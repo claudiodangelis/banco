@@ -273,7 +273,7 @@ fn fuzzy_match(query: &str, target: &str) -> bool {
     false
 }
 
-fn resolve_item_path(root: &Path, provider_name: &str, module_name: &str, item: &serde_json::Value) -> Option<PathBuf> {
+pub(crate) fn resolve_item_path(root: &Path, provider_name: &str, module_name: &str, item: &serde_json::Value) -> Option<PathBuf> {
     match (provider_name, module_name) {
         ("local", "notes") => {
             let name = item.get("name")?.as_str()?;
@@ -320,7 +320,7 @@ struct ListRow {
     level: u8,
 }
 
-fn item_project_key(item: &serde_json::Value) -> Option<String> {
+pub(crate) fn item_project_key(item: &serde_json::Value) -> Option<String> {
     if let Some(p) = item.get("project").and_then(|v| v.as_str()) {
         if !p.is_empty() { return Some(p.to_string()); }
     }
@@ -335,7 +335,7 @@ fn item_project_key(item: &serde_json::Value) -> Option<String> {
     None
 }
 
-fn sorted_statuses(items: impl Iterator<Item = String>) -> Vec<String> {
+pub(crate) fn sorted_statuses(items: impl Iterator<Item = String>) -> Vec<String> {
     const STATUS_ORDER: &[&str] = &[
         "backlog", "to do", "open",
         "doing", "in progress", "in review",
@@ -1567,7 +1567,7 @@ enum ColumnLine {
     More(String),
 }
 
-fn display_name(raw: &str) -> &str {
+pub(crate) fn display_name(raw: &str) -> &str {
     raw.split_once(" - ").map(|(_, rest)| rest).unwrap_or(raw)
 }
 
@@ -1584,7 +1584,7 @@ fn fit(s: &str, width: usize) -> String {
 /// Build a repos item's display label: `name (branch) *↟N`, where `*` flags an
 /// uncommitted working copy and `↟N` counts branches not merged into HEAD. Items
 /// without a branch (non-repo modules, detached HEAD) render as the bare name.
-fn repo_item_label(item: &serde_json::Value, name: &str) -> String {
+pub(crate) fn repo_item_label(item: &serde_json::Value, name: &str) -> String {
     let Some(branch) = item.get("branch").and_then(|v| v.as_str()).filter(|b| !b.is_empty()) else {
         return name.to_string();
     };

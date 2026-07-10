@@ -4,6 +4,7 @@ mod context;
 mod module;
 mod provider;
 mod providers;
+mod serve;
 mod skills;
 mod state;
 mod sync_state;
@@ -57,7 +58,7 @@ fn write_agent_files(root: &Path, local: &LocalProvider) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn open_browser(url: &str, browse: Option<&config::BrowseConfig>) -> anyhow::Result<()> {
+pub(crate) fn open_browser(url: &str, browse: Option<&config::BrowseConfig>) -> anyhow::Result<()> {
     if let Some(cfg) = browse {
         std::process::Command::new(&cfg.command)
             .args(&cfg.args)
@@ -547,6 +548,9 @@ fn run() -> anyhow::Result<()> {
             let browse_config = provider_browse.get(selected_provider)
                 .or(project_config.browse.as_ref());
             open_browser(url, browse_config)?;
+        }
+        Commands::Serve { port, bind, no_open } => {
+            serve::serve(&root, &bind, port, !no_open)?;
         }
         Commands::Provider { action } => match action {
             ProviderAction::Add => {

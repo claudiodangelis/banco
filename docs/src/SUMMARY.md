@@ -33,6 +33,7 @@
 - [provider](commands/provider.md)
 - [sync](commands/sync.md)
 - [browse](commands/browse.md)
+- [serve](commands/serve.md)
 - [check](commands/check.md)
 - [tidy](commands/tidy.md)
 - [skills](commands/skills.md)

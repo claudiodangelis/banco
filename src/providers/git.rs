@@ -280,6 +280,56 @@ pub fn repo_status(repo_path: &Path) -> Option<RepoStatus> {
     })
 }
 
+/// A single commit from `git log`, for the read-only history view.
+pub struct Commit {
+    pub short_hash: String,
+    pub author: String,
+    /// Author date, ISO-8601 / strict (e.g. `2026-07-10 14:22:01 +0200`).
+    pub date: String,
+    pub subject: String,
+}
+
+/// Return up to `max` most-recent commits reachable from HEAD. Returns `None`
+/// when the path is not a git repository or git can't be queried (e.g. an empty
+/// repo with no commits yet). Fields are split on NUL to stay robust against any
+/// character inside a subject or author name.
+pub fn git_log(repo_path: &Path, max: usize) -> Option<Vec<Commit>> {
+    if !repo_path.join(".git").exists() {
+        return None;
+    }
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_path)
+        .args([
+            "log",
+            &format!("--max-count={max}"),
+            "--no-color",
+            "--pretty=format:%h%x00%an%x00%ad%x00%s%x1e",
+            "--date=format:%Y-%m-%d %H:%M:%S %z",
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let commits = text
+        .split('\u{1e}')
+        .map(str::trim_start)
+        .filter(|r| !r.is_empty())
+        .filter_map(|record| {
+            let mut f = record.split('\u{0}');
+            Some(Commit {
+                short_hash: f.next()?.to_string(),
+                author: f.next()?.to_string(),
+                date: f.next()?.to_string(),
+                subject: f.next().unwrap_or("").to_string(),
+            })
+        })
+        .collect();
+    Some(commits)
+}
+
 pub fn read_git_remote_url(repo_path: &Path) -> Option<String> {
     let content = std::fs::read_to_string(repo_path.join(".git/config")).ok()?;
     let mut in_origin = false;
