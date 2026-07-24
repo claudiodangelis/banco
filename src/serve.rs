@@ -90,6 +90,7 @@ fn handle_item(root: &Path, query: &str) -> Result<String, u16> {
 <div class="meta">{meta}</div>
 <article class="markdown">{rendered}</article>
 <div class="goto">
+  <button class="copy-path" data-path="{rel_attr}" onclick="bancoCopyPath(this)">Copy path</button>
   <div class="goto-panel" id="goto-panel" hidden>
     <a href="#" data-goto="top">↑ Go to top</a>
     <a href="#" data-goto="bottom">↓ Go to bottom</a>
@@ -218,8 +219,13 @@ fn handle_log(root: &Path, query: &str) -> Result<String, u16> {
 
     let inner = format!(
         "<a href=\"/\" class=\"back\">← dashboard</a>\
-         <h1>{title} <span class=\"count\">history</span></h1>{capped}{rows}",
+         <h1>{title} <span class=\"count\">history</span></h1>\
+         {capped}{rows}\
+         <div class=\"goto\">\
+           <button class=\"copy-path\" data-path=\"{rel}\" onclick=\"bancoCopyPath(this)\">Copy path</button>\
+         </div>",
         title = esc(&name),
+        rel = esc(&rel),
     );
     Ok(page(&name, &inner))
 }
@@ -837,7 +843,7 @@ li a:hover {{ color: var(--accent); border-color: var(--accent); }}
 .log-subject {{ color: var(--fg); }}
 .log-meta {{ color: var(--muted); font-size: .8rem; margin-top: .15rem; }}
 .log-meta code {{ background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: .02rem .3rem; font-size: .95em; }}
-.goto {{ position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 50; }}
+.goto {{ position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 50; display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; }}
 .goto-btn {{ background: var(--accent); color: var(--on-accent); border: 0; border-radius: 6px; padding: .5rem .8rem; font-size: .85rem; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); }}
 .goto-panel {{ position: absolute; bottom: 2.6rem; right: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: .4rem; min-width: 200px; max-width: 340px; max-height: 60vh; overflow: auto; box-shadow: 0 4px 16px rgba(0,0,0,.35); }}
 .goto-panel a {{ display: block; color: var(--fg); text-decoration: none; padding: .25rem .5rem; border-radius: 4px; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
@@ -850,6 +856,9 @@ li a:hover {{ color: var(--accent); border-color: var(--accent); }}
 .goto-toc a.lvl-5 {{ padding-left: 2.9rem; }}
 .goto-toc a.lvl-6 {{ padding-left: 3.5rem; }}
 .goto-empty {{ display: block; color: var(--muted); font-size: .8rem; padding: .25rem .5rem; }}
+.copy-path {{ background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .8rem; font-size: .85rem; font-weight: 600; cursor: pointer; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,.3); }}
+.copy-path:hover {{ border-color: var(--accent); color: var(--accent); }}
+.copy-path.copied {{ border-color: var(--accent); color: var(--accent); }}
 </style>
 </head>
 <body>
@@ -868,6 +877,31 @@ function bancoToggleTheme() {{
   bancoApplyThemeLabel();
 }}
 bancoApplyThemeLabel();
+
+function bancoCopyPath(btn) {{
+  var path = btn.getAttribute("data-path");
+  function done() {{
+    var original = btn.textContent;
+    btn.textContent = "Copied";
+    btn.classList.add("copied");
+    setTimeout(function () {{ btn.textContent = original; btn.classList.remove("copied"); }}, 1200);
+  }}
+  if (navigator.clipboard && navigator.clipboard.writeText) {{
+    navigator.clipboard.writeText(path).then(done, function () {{ bancoFallbackCopy(path, done); }});
+  }} else {{
+    bancoFallbackCopy(path, done);
+  }}
+}}
+function bancoFallbackCopy(text, done) {{
+  var ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try {{ document.execCommand("copy"); done(); }} catch (e) {{}}
+  document.body.removeChild(ta);
+}}
 
 (function () {{
   var KEY = "banco-collapsed";
