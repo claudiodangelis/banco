@@ -36,6 +36,14 @@ so tokens are never stored in plain text.
 | `gitlab` | tasks, repos        | Syncs issues and repositories via API + SSH                  |
 | `jira`   | tasks               | Fetches issues via `claude` CLI + Atlassian Rovo MCP server  |
 
+## AI agents
+
+Banco is designed to be driven by an AI agent as naturally as by a human at the keyboard.
+
+- `banco context` emits a single JSON snapshot — providers, modules, items, and the exact labels/enum values each module accepts — so an agent always grounds its next command in real project state instead of guessing.
+- `banco init` scaffolds `.banco/BANCO.md` with agent-facing rules (always read context first, create items only through `banco new`, never touch files directly) and wires it into `AGENTS.md`/`CLAUDE.md`, so any compatible coding agent picks up the same playbook automatically.
+- `banco skills install claude` drops ready-made Claude Code skills (like `tidy`, which finds orphaned data and asks before deleting anything) straight into `.claude/skills/`, turning banco-specific workflows into commands your agent can invoke on its own.
+
 ## Documentation
 
 Full documentation is available in [`docs/`](docs/).
