@@ -75,7 +75,12 @@ pub fn fetch_issues(
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     let inner = extract_result(&stdout).unwrap_or_else(|| stdout.to_string());
-    let inner = strip_code_fences(&inner);
+    let inner = extract_json_array(&inner).ok_or_else(|| {
+        anyhow::anyhow!(
+            "failed to parse claude output as JSON: no JSON array found\nRaw output:\n{}",
+            stdout.trim()
+        )
+    })?;
 
     serde_json::from_str(inner).map_err(|e| {
         anyhow::anyhow!(
@@ -96,17 +101,14 @@ fn extract_result(raw: &str) -> Option<String> {
     serde_json::from_str::<Envelope>(raw).ok().map(|e| e.result)
 }
 
-/// Strips a leading/trailing markdown code fence (```json ... ```), which
-/// `claude` emits non-deterministically even when asked for raw JSON.
-fn strip_code_fences(s: &str) -> &str {
-    let t = s.trim();
-    let Some(t) = t.strip_prefix("```") else {
-        return t;
-    };
-    // Drop the optional language tag on the opening fence's line.
-    let t = match t.split_once('\n') {
-        Some((_lang, rest)) => rest,
-        None => t,
-    };
-    t.trim().strip_suffix("```").unwrap_or(t).trim()
+/// Extracts the JSON array from claude's answer, tolerating surrounding prose
+/// or markdown code fences that `claude` emits non-deterministically even when
+/// asked for raw JSON. Slices from the first `[` to the last `]`.
+fn extract_json_array(s: &str) -> Option<&str> {
+    let start = s.find('[')?;
+    let end = s.rfind(']')?;
+    if end < start {
+        return None;
+    }
+    Some(&s[start..=end])
 }
