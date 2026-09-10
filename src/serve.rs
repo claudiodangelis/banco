@@ -7,6 +7,16 @@ use crate::tui::{display_name, item_project_key, repo_item_label, resolve_item_p
 
 const ORANGE: &str = "#f97316";
 
+/// Square workbench glyph from the logo, used as the browser favicon.
+const FAVICON: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g fill="#F97316">
+    <rect x="6" y="20" width="88" height="10" rx="2"/>
+    <rect x="24" y="32" width="10" height="54" rx="1"/>
+    <rect x="66" y="32" width="10" height="54" rx="1"/>
+    <rect x="34" y="66" width="32" height="8" rx="1"/>
+  </g>
+</svg>"##;
+
 pub fn serve(root: &Path, bind: &str, port: u16, open: bool) -> anyhow::Result<()> {
     let addr = format!("{bind}:{port}");
     let server = Server::http(&addr)
@@ -32,6 +42,7 @@ pub fn serve(root: &Path, bind: &str, port: u16, open: bool) -> anyhow::Result<(
         let response = match path {
             "/" => html_response(render_dashboard(root)),
             "/search" => html_response(render_search_page()),
+            "/favicon.svg" => svg_response(FAVICON),
             "/item" => match handle_item(root, query) {
                 Ok(body) => html_response(body),
                 Err(code) => error_response(code),
@@ -764,6 +775,7 @@ fn page(title: &str, body: &str) -> String {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>{title} · banco</title>
 <script>
 (function () {{
@@ -951,6 +963,12 @@ fn html_response(body: String) -> Response<std::io::Cursor<Vec<u8>>> {
 fn text_response(body: String) -> Response<std::io::Cursor<Vec<u8>>> {
     Response::from_string(body).with_header(
         Header::from_bytes(&b"Content-Type"[..], &b"text/plain; charset=utf-8"[..]).unwrap(),
+    )
+}
+
+fn svg_response(body: &str) -> Response<std::io::Cursor<Vec<u8>>> {
+    Response::from_string(body.to_string()).with_header(
+        Header::from_bytes(&b"Content-Type"[..], &b"image/svg+xml"[..]).unwrap(),
     )
 }
 
