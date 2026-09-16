@@ -50,6 +50,25 @@ providers:
       # projects_pattern: mygroup/.*
 ```
 
+### Gerrit
+
+Repositories only — a Gerrit review is code review rather than an issue, so there
+is no `tasks` module. Repos are cloned over SSH; Gerrit's standard `commit-msg`
+hook is installed automatically so pushes to `refs/for/*` carry a `Change-Id`.
+
+```yaml
+providers:
+  - name: gerrit
+    # alias: gerrit-work
+    config:
+      host: https://review.leboncoin.ci  # required; instance URL
+      username: firstname.lastname       # required; used for the SSH clone URL
+      # ssh_port: 29418                   # optional; default 29418
+      # namespaced: true                  # optional; clone into the full project path (default false)
+      projects:                          # required; explicit project paths
+        - core/infra/my-service
+```
+
 ### JIRA
 
 Delegates to the `claude` CLI via the Atlassian Rovo MCP server — no API token
