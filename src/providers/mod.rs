@@ -1,4 +1,5 @@
 pub mod frontmatter;
+pub mod gerrit;
 pub mod git;
 pub mod github;
 pub mod gitlab;

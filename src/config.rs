@@ -65,6 +65,16 @@ impl ProviderEntry {
         !self.disabled_modules.iter().any(|m| m == module)
     }
 
+    /// A boolean flag, defaulting to `false` when unset. Accepts a real YAML
+    /// bool or a `$VAR`-interpolated string parsed case-insensitively.
+    pub fn get_bool(&self, key: &str) -> bool {
+        match self.config.get(key) {
+            Some(serde_yaml::Value::Bool(b)) => *b,
+            Some(serde_yaml::Value::String(s)) => expand_env(s).trim().eq_ignore_ascii_case("true"),
+            _ => false,
+        }
+    }
+
     pub fn get_list(&self, key: &str) -> Vec<String> {
         self.config
             .get(key)

@@ -13,6 +13,7 @@ Set interactively via `banco provider add`.
 | `host`             | no       | GitLab instance URL (default: `https://gitlab.com`)            |
 | `projects`         | no †     | Explicit list of project paths in `namespace/project` format   |
 | `projects_pattern` | no †     | Regex matched against `namespace/project` — e.g. `mygroup/.*` |
+| `namespaced`       | no       | Clone into the full `namespace/project` path instead of a flat leaf dir (default: `false`) |
 
 † Exactly one of `projects` or `projects_pattern` must be set; they are mutually exclusive.
 
@@ -55,7 +56,11 @@ tasks/
         └── 0042 - Fix login bug.md
 ```
 
-Repos are cloned under `repos/<provider>/`.
+Repos are cloned under `repos/<provider>/`. By default the layout is flat — each project is
+cloned into a directory named after its last path segment (`repos/gitlab/<project>/`). Set
+`namespaced: true` to clone into the full `namespace/project` path
+(`repos/gitlab/<namespace>/<project>/`), which avoids collisions when namespaces share a project
+name.
 
 ## Task file format
 

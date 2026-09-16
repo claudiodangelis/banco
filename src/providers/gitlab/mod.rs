@@ -60,6 +60,12 @@ impl GitLabProvider {
                 kind: ConfigParamKind::String,
                 required: false,
             },
+            ConfigParam {
+                name: "namespaced",
+                description: "Clone into the full project path (namespace/project) instead of a flat leaf dir — avoids collisions when namespaces share a project name (default: false)",
+                kind: ConfigParamKind::Bool,
+                required: false,
+            },
         ]
     }
 
@@ -103,7 +109,10 @@ impl GitLabProvider {
     }
 
     fn gitlab_repos(&self, root: &Path) -> GitLabRepos {
-        GitLabRepos { repos_root: self.repos_root(root) }
+        GitLabRepos {
+            repos_root: self.repos_root(root),
+            namespaced: self.entry.get_bool("namespaced"),
+        }
     }
 }
 
@@ -281,26 +290,20 @@ impl Provider for GitLabProvider {
         let repos_base = self.repos_root(root);
         let mut repo_items: Vec<BrowseItem> = Vec::new();
         if self.entry.is_module_enabled("repos") && repos_base.exists() {
-            let mut entries: Vec<_> = std::fs::read_dir(&repos_base)?
-                .filter_map(|e| e.ok())
-                .collect();
-            entries.sort_by_key(|e| e.file_name());
-            for entry in entries {
-                let path = entry.path();
-                if path.is_dir() {
-                    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-                    if let Some(remote_url) = read_git_remote_url(&path) {
-                        let base = normalize_git_url(&remote_url);
-                        slug_to_url.entry(name.clone()).or_insert_with(|| base.clone());
-                        repo_items.push(BrowseItem {
-                            display: name,
-                            pages: vec![
-                                ("Repository".to_string(),     base.clone()),
-                                ("Merge Requests".to_string(), format!("{}/-/merge_requests", base)),
-                                ("Pipelines".to_string(),      format!("{}/-/pipelines", base)),
-                            ],
-                        });
-                    }
+            for path in crate::providers::git::discover_repos(&repos_base) {
+                let name = crate::providers::git::repo_rel_name(&repos_base, &path);
+                if let Some(remote_url) = read_git_remote_url(&path) {
+                    let base = normalize_git_url(&remote_url);
+                    let slug = name.rsplit('/').next().unwrap_or(&name).to_string();
+                    slug_to_url.entry(slug).or_insert_with(|| base.clone());
+                    repo_items.push(BrowseItem {
+                        display: name,
+                        pages: vec![
+                            ("Repository".to_string(),     base.clone()),
+                            ("Merge Requests".to_string(), format!("{}/-/merge_requests", base)),
+                            ("Pipelines".to_string(),      format!("{}/-/pipelines", base)),
+                        ],
+                    });
                 }
             }
         }

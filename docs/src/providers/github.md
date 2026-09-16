@@ -14,6 +14,7 @@ Set interactively via `banco provider add`.
 | `host`             | no       | GitHub instance URL (default: `https://github.com`) — set for GitHub Enterprise Server  |
 | `projects`         | no †     | Explicit list of project paths in `owner/repo` format                                    |
 | `projects_pattern` | no †     | Regex matched against `owner/repo` — e.g. `myorg/.*`                                    |
+| `namespaced`       | no       | Clone into the full `owner/repo` path instead of a flat leaf dir (default: `false`)      |
 
 † Exactly one of `projects` or `projects_pattern` must be set; they are mutually exclusive.
 
@@ -57,7 +58,10 @@ tasks/
             └── 0042 - Fix login bug.md
 ```
 
-Repos are cloned under `repos/<provider>/`.
+Repos are cloned under `repos/<provider>/`. By default the layout is flat — each repo is cloned
+into a directory named after the repo (`repos/github/<repo>/`). Set `namespaced: true` to clone
+into the full `owner/repo` path (`repos/github/<owner>/<repo>/`), which avoids collisions when
+owners share a repo name.
 
 ## Task file format
 

@@ -28,6 +28,7 @@ use module::BrowseItem;
 use context::{ContextOutput, ProviderContext};
 use provider::{Provider, SyncOpts};
 use providers::local::{CheckFindings, LocalProvider};
+use providers::gerrit::GerritProvider;
 use providers::github::GitHubProvider;
 use providers::gitlab::GitLabProvider;
 use providers::jira::JiraProvider;
@@ -105,6 +106,7 @@ fn check_config(root: &Path) -> anyhow::Result<Vec<String>> {
             "local"  => LocalProvider::available_modules(),
             "github" => GitHubProvider::available_modules(),
             "gitlab" => GitLabProvider::available_modules(),
+            "gerrit" => GerritProvider::available_modules(),
             "jira"   => JiraProvider::available_modules(),
             _        => vec![],
         };
@@ -118,6 +120,7 @@ fn check_config(root: &Path) -> anyhow::Result<Vec<String>> {
             "local"  => LocalProvider::available_config_schema(),
             "github" => GitHubProvider::available_config_schema(),
             "gitlab" => GitLabProvider::available_config_schema(),
+            "gerrit" => GerritProvider::available_config_schema(),
             "jira"   => JiraProvider::available_config_schema(),
             // Unknown provider name: can't validate its modules or config.
             _        => {
@@ -154,7 +157,7 @@ fn check_config(root: &Path) -> anyhow::Result<Vec<String>> {
     Ok(issues)
 }
 
-const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab", "jira"];
+const AVAILABLE_PROVIDERS: &[&str] = &["github", "gitlab", "gerrit", "jira"];
 
 pub(crate) fn provider_add(root: &Path) -> anyhow::Result<()> {
     let theme = ColorfulTheme::default();
@@ -189,6 +192,7 @@ pub(crate) fn provider_add(root: &Path) -> anyhow::Result<()> {
     let schema = match name {
         "github" => GitHubProvider::available_config_schema(),
         "gitlab" => GitLabProvider::available_config_schema(),
+        "gerrit" => GerritProvider::available_config_schema(),
         "jira"   => JiraProvider::available_config_schema(),
         _ => vec![],
     };
@@ -230,12 +234,22 @@ pub(crate) fn provider_add(root: &Path) -> anyhow::Result<()> {
                     cfg_map.insert(param.name.to_string(), serde_yaml::Value::Sequence(items));
                 }
             }
+            provider::ConfigParamKind::Bool => {
+                let value = dialoguer::Confirm::with_theme(&theme)
+                    .with_prompt(&prompt)
+                    .default(false)
+                    .interact()?;
+                if value {
+                    cfg_map.insert(param.name.to_string(), serde_yaml::Value::Bool(true));
+                }
+            }
         }
     }
 
     let modules = match name {
         "github" => GitHubProvider::available_modules(),
         "gitlab" => GitLabProvider::available_modules(),
+        "gerrit" => GerritProvider::available_modules(),
         "jira"   => JiraProvider::available_modules(),
         _ => vec![],
     };
@@ -330,6 +344,7 @@ fn remote_providers(root: &Path) -> anyhow::Result<Vec<Box<dyn Provider>>> {
         match entry.name.as_str() {
             "github" => providers.push(Box::new(GitHubProvider::new(entry))),
             "gitlab" => providers.push(Box::new(GitLabProvider::new(entry))),
+            "gerrit" => providers.push(Box::new(GerritProvider::new(entry))),
             "jira"   => providers.push(Box::new(JiraProvider::new(entry))),
             _ => {}
         }

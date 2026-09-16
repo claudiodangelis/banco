@@ -20,7 +20,7 @@ Sync is non-destructive: it never deletes or overwrites existing files.
 | Option | Description |
 | --- | --- |
 | `--module <tasks\|repos>` | Limit sync to a single module; skips the other. Useful when you only want to fetch issues without cloning repos, or vice versa. |
-| `--pattern <regex>` | Only sync projects whose path (`owner/repo` for GitHub/GitLab) matches this regex. Applied on top of the project list already defined in the provider config. Not applicable to Jira. |
+| `--pattern <regex>` | Only sync projects whose path (`owner/repo` for GitHub, `namespace/project` for GitLab, the project path for Gerrit) matches this regex. Applied on top of the project list already defined in the provider config. Not applicable to Jira. |
 | `--jobs <n>`, `-j <n>` | Number of repos to clone/fetch concurrently. Defaults to `6`. Repo syncing is network-bound, so this is a small fixed value rather than something derived from CPU cores — raising it mainly risks tripping the remote's connection or rate limits. |
 
 ## Sync state

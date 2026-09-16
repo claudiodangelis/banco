@@ -10,13 +10,21 @@ use super::client::GitHubClient;
 
 pub struct GitHubRepos {
     pub repos_root: PathBuf,
+    /// When true, clone into the full project path (`repos/github/owner/repo`);
+    /// otherwise into a flat leaf directory (`repos/github/repo`).
+    pub namespaced: bool,
 }
 
 impl GitHubRepos {
     pub fn sync(&self, client: &GitHubClient, projects: &[String], jobs: usize) -> anyhow::Result<()> {
         crate::providers::git::sync_repos(projects, &self.repos_root, jobs, |owner_repo| {
             let repo = client.repo(owner_repo)?;
-            Ok((repo.ssh_url, self.repos_root.join(&repo.name)))
+            let dest = if self.namespaced {
+                self.repos_root.join(owner_repo)
+            } else {
+                self.repos_root.join(&repo.name)
+            };
+            Ok((repo.ssh_url, dest))
         })
     }
 }
@@ -61,16 +69,9 @@ impl Module for GitHubRepos {
             return Ok(vec![]);
         }
         let mut items = Vec::new();
-        for entry in std::fs::read_dir(&self.repos_root)? {
-            let path = entry?.path();
-            if path.is_dir() {
-                let name = path
-                    .file_name()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("")
-                    .to_string();
-                items.push(crate::providers::git::repo_item(name, &path));
-            }
+        for path in crate::providers::git::discover_repos(&self.repos_root) {
+            let name = crate::providers::git::repo_rel_name(&self.repos_root, &path);
+            items.push(crate::providers::git::repo_item(name, &path));
         }
         Ok(items)
     }
