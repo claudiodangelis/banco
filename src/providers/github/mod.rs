@@ -61,6 +61,12 @@ impl GitHubProvider {
                 kind: ConfigParamKind::String,
                 required: false,
             },
+            ConfigParam {
+                name: "namespaced",
+                description: "Clone into the full project path (owner/repo) instead of a flat leaf dir — avoids collisions when owners share a repo name (default: false)",
+                kind: ConfigParamKind::Bool,
+                required: false,
+            },
         ]
     }
 
@@ -108,6 +114,7 @@ impl GitHubProvider {
     fn github_repos(&self, root: &Path) -> GitHubRepos {
         GitHubRepos {
             repos_root: self.repos_root(root),
+            namespaced: self.entry.get_bool("namespaced"),
         }
     }
 }
@@ -319,25 +326,18 @@ impl Provider for GitHubProvider {
         let repos_base = self.repos_root(root);
         let mut repo_items: Vec<BrowseItem> = Vec::new();
         if self.entry.is_module_enabled("repos") && repos_base.exists() {
-            let mut entries: Vec<_> = std::fs::read_dir(&repos_base)?
-                .filter_map(|e| e.ok())
-                .collect();
-            entries.sort_by_key(|e| e.file_name());
-            for entry in entries {
-                let path = entry.path();
-                if path.is_dir() {
-                    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-                    if let Some(remote_url) = read_git_remote_url(&path) {
-                        let base = normalize_git_url(&remote_url);
-                        repo_items.push(BrowseItem {
-                            display: name,
-                            pages: vec![
-                                ("Repository".to_string(),    base.clone()),
-                                ("Pull Requests".to_string(), format!("{}/pulls", base)),
-                                ("Actions".to_string(),       format!("{}/actions", base)),
-                            ],
-                        });
-                    }
+            for path in crate::providers::git::discover_repos(&repos_base) {
+                let name = crate::providers::git::repo_rel_name(&repos_base, &path);
+                if let Some(remote_url) = read_git_remote_url(&path) {
+                    let base = normalize_git_url(&remote_url);
+                    repo_items.push(BrowseItem {
+                        display: name,
+                        pages: vec![
+                            ("Repository".to_string(),    base.clone()),
+                            ("Pull Requests".to_string(), format!("{}/pulls", base)),
+                            ("Actions".to_string(),       format!("{}/actions", base)),
+                        ],
+                    });
                 }
             }
         }

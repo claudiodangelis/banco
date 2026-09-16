@@ -341,12 +341,15 @@ fn handle_search(root: &Path, query: &str) -> Result<String, u16> {
                 continue;
             }
             let provider = provider_path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-            for repo_entry in std::fs::read_dir(&provider_path).into_iter().flatten().filter_map(|e| e.ok()) {
-                let repo_path = repo_entry.path();
-                if !repo_path.is_dir() {
-                    continue;
-                }
-                let name = repo_path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+            // Discover working copies at any depth: flat providers nest one level
+            // (`repos/github/<repo>`), Gerrit nests by project path
+            // (`repos/gerrit/<owner>/<repo>`).
+            for repo_path in crate::providers::git::discover_repos(&provider_path) {
+                let name = repo_path
+                    .strip_prefix(&provider_path)
+                    .unwrap_or(&repo_path)
+                    .to_string_lossy()
+                    .replace('\\', "/");
                 if !name.to_lowercase().contains(&needle) {
                     continue;
                 }

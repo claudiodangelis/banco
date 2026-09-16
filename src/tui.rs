@@ -31,6 +31,7 @@ fn gather_check_details(root: &Path) -> anyhow::Result<CheckDetail> {
             let schema = match entry.name.as_str() {
                 "github" => crate::providers::github::GitHubProvider::available_config_schema(),
                 "gitlab" => crate::providers::gitlab::GitLabProvider::available_config_schema(),
+                "gerrit" => crate::providers::gerrit::GerritProvider::available_config_schema(),
                 "jira"   => crate::providers::jira::JiraProvider::available_config_schema(),
                 _        => continue,
             };
@@ -940,10 +941,11 @@ const HILITE: &str = "\x1b[48;2;60;40;10m"; // selected-row background
 
 /// Config schema for a provider name, or empty for unknown/local.
 fn provider_schema(name: &str) -> Vec<ConfigParam> {
-    use crate::providers::{github::GitHubProvider, gitlab::GitLabProvider, jira::JiraProvider};
+    use crate::providers::{gerrit::GerritProvider, github::GitHubProvider, gitlab::GitLabProvider, jira::JiraProvider};
     match name {
         "github" => GitHubProvider::available_config_schema(),
         "gitlab" => GitLabProvider::available_config_schema(),
+        "gerrit" => GerritProvider::available_config_schema(),
         "jira"   => JiraProvider::available_config_schema(),
         _        => LocalProvider::available_config_schema(),
     }
@@ -951,11 +953,12 @@ fn provider_schema(name: &str) -> Vec<ConfigParam> {
 
 /// Modules a provider implements (used for the per-module on/off toggles).
 fn provider_modules(name: &str) -> Vec<&'static str> {
-    use crate::providers::{github::GitHubProvider, gitlab::GitLabProvider, jira::JiraProvider};
+    use crate::providers::{gerrit::GerritProvider, github::GitHubProvider, gitlab::GitLabProvider, jira::JiraProvider};
     match name {
         "local"  => LocalProvider::available_modules(),
         "github" => GitHubProvider::available_modules(),
         "gitlab" => GitLabProvider::available_modules(),
+        "gerrit" => GerritProvider::available_modules(),
         "jira"   => JiraProvider::available_modules(),
         _        => vec![],
     }
@@ -1194,6 +1197,10 @@ fn field_line(entry: &ProviderEntry, schema: &[ConfigParam], modules: &[&str], f
                     let color = if p.required && n == 0 { RED } else { WHITE };
                     (color, row(p.name, format!("[{n} item{}]", if n == 1 { "" } else { "s" })))
                 }
+                ConfigParamKind::Bool => {
+                    let mark = if entry.get_bool(p.name) { "[x]" } else { "[ ]" };
+                    (WHITE, row(p.name, mark.to_string()))
+                }
             }
         }
         Field::BrowseCommand => {
@@ -1310,6 +1317,14 @@ fn apply_field(
                     } else {
                         let seq = updated.into_iter().map(serde_yaml::Value::String).collect();
                         entry.config.insert(p.name.to_string(), serde_yaml::Value::Sequence(seq));
+                    }
+                    return Ok(true);
+                }
+                ConfigParamKind::Bool => {
+                    if entry.get_bool(p.name) {
+                        entry.config.remove(p.name);
+                    } else {
+                        entry.config.insert(p.name.to_string(), serde_yaml::Value::Bool(true));
                     }
                     return Ok(true);
                 }

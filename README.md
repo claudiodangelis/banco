@@ -21,7 +21,8 @@ cargo install --path .
 
 Items (notes, tasks, bookmarks, repos) are grouped into **modules** and backed by **providers**.
 The built-in `local` provider stores everything on disk with no external dependencies. Remote
-providers (GitHub, GitLab) sync issues as tasks and clone repositories via SSH. The JIRA provider
+providers (GitHub, GitLab) sync issues as tasks and clone repositories via SSH; Gerrit clones
+repositories only. The JIRA provider
 fetches issues via the `claude` CLI and the Atlassian Rovo MCP server — no API token required.
 
 Provider configuration lives in `.banco/config.yml`. String values support `$ENV_VAR` expansion

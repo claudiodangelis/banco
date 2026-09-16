@@ -147,6 +147,7 @@ fn provider_implements(name: &str, module: &str) -> bool {
     match name {
         "local" => matches!(module, "notes" | "tasks" | "bookmarks" | "repos"),
         "github" | "gitlab" => matches!(module, "tasks" | "repos"),
+        "gerrit" => module == "repos",
         "jira" => module == "tasks",
         _ => false,
     }
@@ -199,6 +200,17 @@ fn rel(root: &Path, path: &Path) -> String {
         .unwrap_or(path)
         .to_string_lossy()
         .into_owned()
+}
+
+/// A discovered repo's name relative to its provider directory. Flat layouts
+/// yield a plain name (`my-repo`); namespaced layouts (Gerrit) yield the full
+/// project path (`leboncoin/go`), normalized to forward slashes.
+fn repo_rel_name(provider_dir: &Path, repo_dir: &Path) -> String {
+    repo_dir
+        .strip_prefix(provider_dir)
+        .unwrap_or(repo_dir)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 
 fn subdirs(dir: &Path) -> Vec<PathBuf> {
@@ -254,8 +266,8 @@ fn detect_repos(
             // Local repos are flagged only when the module is turned off for the
             // local provider; otherwise they are user-managed and never stale.
             if local_repos_disabled {
-                for repo_dir in subdirs(&provider_dir) {
-                    let name = repo_dir.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                for repo_dir in git::discover_repos(&provider_dir) {
+                    let name = repo_rel_name(&provider_dir, &repo_dir);
                     findings.push(RepoFinding {
                         provider: "local".to_string(),
                         name,
@@ -270,12 +282,8 @@ fn detect_repos(
 
         let info = providers.get(&display);
 
-        for repo_dir in subdirs(&provider_dir) {
-            let name = repo_dir
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string();
+        for repo_dir in git::discover_repos(&provider_dir) {
+            let name = repo_rel_name(&provider_dir, &repo_dir);
 
             let reason: Option<&'static str> = match info {
                 None => Some("provider_removed"),

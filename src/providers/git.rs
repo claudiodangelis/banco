@@ -96,6 +96,11 @@ fn clone_or_fetch(label: &str, ssh_url: &str, dest: &Path) -> Outcome {
             _ => Outcome::FetchWarning(label.to_string()),
         }
     } else {
+        // Namespaced providers (e.g. Gerrit `owner/repo`) clone into a nested
+        // path; make sure the intermediate directories exist first.
+        if let Some(parent) = dest.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
         match Command::new("git")
             .args(["clone", ssh_url, dest.to_str().unwrap()])
             .output()
@@ -259,6 +264,47 @@ pub fn repo_item(name: String, repo_path: &Path) -> serde_json::Value {
         "dirty": status.as_ref().map(|s| s.dirty).unwrap_or(false),
         "unmerged_branches": status.as_ref().map(|s| s.unmerged_branches).unwrap_or(0),
     })
+}
+
+/// Find git working copies under `base`: directories that directly contain a
+/// `.git` entry. Descent stops at a working copy, so a repo nested inside another
+/// repo's tree is ignored. Handles both flat layouts (`repos/github/<repo>`) and
+/// namespaced ones (`repos/gerrit/<owner>/<repo>`). Returns absolute paths sorted
+/// lexically; `base` itself is never returned.
+pub fn discover_repos(base: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if base.is_dir() {
+        discover_repos_into(base, base, &mut out);
+    }
+    out.sort();
+    out
+}
+
+fn discover_repos_into(base: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
+    if dir != base && dir.join(".git").exists() {
+        out.push(dir.to_path_buf());
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            discover_repos_into(base, &path, out);
+        }
+    }
+}
+
+/// A discovered repo's name relative to its provider root: a plain leaf
+/// (`my-repo`) under a flat layout, or the full project path (`owner/repo`)
+/// under a namespaced one, always using forward slashes.
+pub fn repo_rel_name(base: &Path, repo_path: &Path) -> String {
+    repo_path
+        .strip_prefix(base)
+        .unwrap_or(repo_path)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 
 /// Summarize a git working copy for display. Returns `None` when the path is not

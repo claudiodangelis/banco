@@ -21,6 +21,7 @@
 - [Local](providers/local.md)
 - [GitHub](providers/github.md)
 - [GitLab](providers/gitlab.md)
+- [Gerrit](providers/gerrit.md)
 - [JIRA](providers/jira.md)
 
 # Commands
