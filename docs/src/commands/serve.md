@@ -41,6 +41,9 @@ the document.
 The page polls the file's modification time every two seconds and reloads automatically when
 the file changes on disk, so an open tab stays in sync with edits made elsewhere.
 
+Files in the project's top-level [`misc/`](../misc.md) directory are served under `/misc/`, so a
+document can embed assets stored there — for example `![diagram](/misc/diagram.png)`.
+
 ### Go to popup
 
 A **Go to** button in the bottom-right corner (or pressing `g`) opens a popup with:
