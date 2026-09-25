@@ -17,3 +17,12 @@ my-project/
 ├── tasks/
 └── ...
 ```
+
+## Assets in the web UI
+
+`banco serve` serves the contents of `misc/` under `/misc/`, so markdown rendered in the web UI
+can reference files kept there:
+
+```markdown
+![architecture](/misc/architecture.png)
+```

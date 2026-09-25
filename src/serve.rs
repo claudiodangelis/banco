@@ -59,6 +59,10 @@ pub fn serve(root: &Path, bind: &str, port: u16, open: bool) -> anyhow::Result<(
                 Ok(body) => json_response(body),
                 Err(code) => error_response(code),
             },
+            p if p.starts_with("/misc/") => match handle_misc(root, p) {
+                Ok((body, content_type)) => bytes_response(body, content_type),
+                Err(code) => error_response(code),
+            },
             _ => error_response(404),
         };
 
@@ -190,6 +194,55 @@ fn handle_mtime(root: &Path, query: &str) -> Result<String, u16> {
         .map_err(|_| 500u16)?
         .as_secs();
     Ok(secs.to_string())
+}
+
+// ── misc assets ──────────────────────────────────────────────────────────────
+
+/// Serve a file from the provider-agnostic top-level `misc/` directory, so that
+/// images and other assets referenced from rendered markdown resolve.
+fn handle_misc(root: &Path, path: &str) -> Result<(Vec<u8>, &'static str), u16> {
+    let rel = url_decode(path.trim_start_matches('/'));
+    let file = safe_misc_path(root, &rel).ok_or(404u16)?;
+    let bytes = std::fs::read(&file).map_err(|_| 404u16)?;
+    Ok((bytes, content_type(&file)))
+}
+
+/// Resolve `rel` against `root`, ensuring the result stays inside `root/misc`
+/// and is an existing file. Returns `None` on traversal attempts or misses.
+fn safe_misc_path(root: &Path, rel: &str) -> Option<PathBuf> {
+    let root = root.canonicalize().ok()?;
+    let canonical = root.join(rel).canonicalize().ok()?;
+    if !canonical.starts_with(root.join("misc")) {
+        return None;
+    }
+    if !canonical.is_file() {
+        return None;
+    }
+    Some(canonical)
+}
+
+fn content_type(path: &Path) -> &'static str {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "avif" => "image/avif",
+        "ico" => "image/x-icon",
+        "pdf" => "application/pdf",
+        "mp4" => "video/mp4",
+        "webm" => "video/webm",
+        "json" => "application/json",
+        "css" => "text/css; charset=utf-8",
+        "txt" | "md" | "log" => "text/plain; charset=utf-8",
+        _ => "application/octet-stream",
+    }
 }
 
 // ── git history ──────────────────────────────────────────────────────────────
@@ -840,6 +893,7 @@ li a:hover {{ color: var(--accent); border-color: var(--accent); }}
 .markdown li::marker {{ color: var(--muted); }}
 .markdown li:has(> input[type="checkbox"]) {{ list-style: none; margin-left: -1.2rem; }}
 .markdown li > input[type="checkbox"] {{ margin-right: .4rem; }}
+.markdown img {{ max-width: 100%; height: auto; }}
 .markdown blockquote {{ border-left: 3px solid var(--accent); margin: 1rem 0; padding: .1rem 1rem; color: var(--muted); }}
 .markdown table {{ border-collapse: collapse; }}
 .markdown th, .markdown td {{ border: 1px solid var(--border); padding: .35rem .6rem; }}
@@ -972,6 +1026,12 @@ fn text_response(body: String) -> Response<std::io::Cursor<Vec<u8>>> {
 fn svg_response(body: &str) -> Response<std::io::Cursor<Vec<u8>>> {
     Response::from_string(body.to_string()).with_header(
         Header::from_bytes(&b"Content-Type"[..], &b"image/svg+xml"[..]).unwrap(),
+    )
+}
+
+fn bytes_response(body: Vec<u8>, content_type: &str) -> Response<std::io::Cursor<Vec<u8>>> {
+    Response::from_data(body).with_header(
+        Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes()).unwrap(),
     )
 }
 
