@@ -34,7 +34,6 @@ install.
 
 ## Bundled skills
 
-| Skill         | Description                                                                                                            |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `hello-world` | A minimal example skill that greets the user; useful for verifying that installed skills are discovered and invokable. |
-| `tidy`        | Finds and removes module data the configuration no longer backs, warning about anything that would be lost first. Drives [`banco tidy`](tidy.md). |
+| Skill  | Description |
+| ------ | ----------- |
+| `tidy` | Finds and removes module data the configuration no longer backs, warning about anything that would be lost first. Drives [`banco tidy`](tidy.md). |
