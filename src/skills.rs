@@ -10,10 +10,6 @@ pub struct BundledSkill {
 /// All skills shipped with banco.
 pub const BUNDLED: &[BundledSkill] = &[
     BundledSkill {
-        name: "hello-world",
-        skill_md: include_str!("skills/hello-world/SKILL.md"),
-    },
-    BundledSkill {
         name: "tidy",
         skill_md: include_str!("skills/tidy/SKILL.md"),
     },
