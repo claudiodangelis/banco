@@ -33,7 +33,7 @@ The top row shows:
 | Field | Source |
 |---|---|
 | **Status** | Most recent sync timestamp with relative age, config check result, and total project folder size |
-| **Providers** | Enabled providers from `.banco/config.yml`, always starting with `local` |
+| **Providers** | Providers from `.banco/config.yml`, always starting with `local`; paused ones are marked `(paused)` |
 
 ### Provider sections
 

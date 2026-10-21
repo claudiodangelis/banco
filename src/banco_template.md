@@ -15,10 +15,12 @@ Add a provider interactively with `banco provider add`, or edit the config file
 directly. Add an `alias` field when configuring multiple providers of the same kind.
 
 Every provider entry accepts two optional top-level fields: `enabled` (default
-`true`; set `false` to switch a provider off without deleting its config) and
-`disabled_modules` (a list of module names to turn off for that provider while
-leaving the rest active — e.g. sync GitHub issues but not repositories). This
-applies to the built-in `local` provider too.
+`true`) and `disabled_modules` (a list of module names to turn off for that
+provider while leaving the rest active — e.g. sync GitHub issues but not
+repositories). Setting `enabled: false` on a remote provider pauses it: a bare
+`banco sync` skips it, `banco sync --all` or `banco sync <name>` still syncs it,
+and its data stays in use. On the built-in `local` provider, `enabled: false`
+turns every local module off; `disabled_modules` applies to `local` too.
 
 ### GitHub
 
@@ -188,8 +190,9 @@ banco new task -n "Fix login bug" -l "status=backlog"
 Pulls data from configured remote providers and writes it to the filesystem.
 
 ```sh
-banco sync                                    # sync all providers
-banco sync github                             # sync a specific provider by name or alias
+banco sync                                    # sync all providers, except paused ones
+banco sync --all                              # sync all providers, paused ones included
+banco sync github                             # sync a specific provider by name or alias (even if paused)
 banco sync github --module tasks              # sync only the tasks module
 banco sync github --module repos              # sync only the repos module
 banco sync github --pattern "myorg/frontend"  # sync only projects matching regex

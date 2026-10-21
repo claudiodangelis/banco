@@ -10,8 +10,11 @@ provider is added automatically on `banco init`; additional providers are added 
 `banco provider add` or the [dashboard](../commands/dashboard.md) config editor (press `c`), which
 can also edit and remove existing providers.
 
-Each provider entry supports a common `enabled` field (default: `true`) — set it to `false` to
-disable a provider without removing its configuration.
+Each provider entry supports a common `enabled` field (default: `true`). Setting it to `false` on
+a remote provider *pauses* it: a bare `banco sync` skips it, but `banco sync --all` or
+`banco sync <name>` still syncs it, and its data stays in use (see [sync](../commands/sync.md)).
+To retire a remote provider, remove its entry. On the built-in `local` provider, `enabled: false`
+turns every local module off.
 
 It also supports an optional `disabled_modules` field: a list of module names to turn off for
 that provider while leaving its other modules active. Omitted (or empty), every module the
