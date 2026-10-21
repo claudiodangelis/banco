@@ -54,6 +54,9 @@ pub enum Commands {
         /// Number of concurrent git clone/fetch operations
         #[arg(long, short)]
         jobs: Option<usize>,
+        /// Also sync providers with `enabled: false`
+        #[arg(long, short)]
+        all: bool,
     },
     /// Generate shell completion scripts
     Completions {

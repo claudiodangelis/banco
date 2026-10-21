@@ -58,8 +58,8 @@ tell the user why.
 
 `reason` values: `removed_from_config` (dropped from the provider's `projects`
 list), `no_longer_matches_pattern` (no longer matched by `projects_pattern`),
-`provider_disabled` (`enabled: false`), `provider_removed` (provider gone from
-config entirely).
+`provider_removed` (provider gone from config entirely). Paused providers
+(`enabled: false`) are never reported — their data is still in use.
 
 Only when a repo is clean (`safe_to_remove: true`) — or the user explicitly
 accepts the loss after being warned — offer to remove its directory.
@@ -73,7 +73,7 @@ copy of issues that may still be active. Task files can also hold local edits
 
 `reason` values: `module_disabled` (the module is in the provider's
 `disabled_modules`, or — for `local` — the module or whole local provider is
-turned off), `removed_from_config`, `provider_disabled`, `provider_removed`.
+turned off), `removed_from_config`, `provider_removed`.
 
 Local findings (`provider: "local"`) are user-authored, not synced from a remote,
 so there is no upstream copy to fall back on — treat them with extra care. Repo
@@ -97,7 +97,7 @@ delete local content.
 ## Modules — a whole tree may be orphaned
 
 Each `modules` finding means an entire top-level directory (`repos/`, `tasks/`,
-`notes/`, `bookmarks/`) is no longer backed by any enabled provider — typically
+`notes/`, `bookmarks/`) is no longer backed by any provider (paused ones count as backing) — typically
 because the user disabled that module everywhere, or disabled the local provider
 that was its only source. `reason` is `no_provider_backs_module`; `entries` is
 how many immediate items the directory holds.

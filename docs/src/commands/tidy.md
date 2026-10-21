@@ -59,7 +59,6 @@ Each synced repository directory that no longer matches the configuration, with 
 | ---------------------------- | -------------------------------------------------------------- |
 | `removed_from_config`        | Dropped from the provider's explicit `projects` list           |
 | `no_longer_matches_pattern`  | No longer matched by the provider's `projects_pattern`         |
-| `provider_disabled`          | The provider is configured with `enabled: false`              |
 | `provider_removed`           | The provider is gone from `.banco/config.yml` entirely         |
 
 `safe_to_remove` is `true` only when the working copy holds nothing that would be lost. When git
@@ -87,7 +86,8 @@ Each task directory whose issues are no longer synced, with file counts split by
 ```
 
 `reason` is one of `module_disabled` (the module is listed in the provider's
-`disabled_modules`), `removed_from_config`, `provider_disabled`, or `provider_removed`.
+`disabled_modules`), `removed_from_config`, or `provider_removed`. A paused remote provider
+(`enabled: false`) is not flagged — its data is still in use.
 Per-project detection (`removed_from_config`) applies to GitHub projects and to GitLab projects
 configured via an explicit `projects` list. The `module_disabled` reason applies to both the
 `tasks` and `repos` modules, and to the **local** provider as well — turning `repos` or `tasks`
@@ -111,9 +111,9 @@ whether it holds content worth keeping.
 
 ### modules
 
-Each whole module directory (`repos/`, `tasks/`, `notes/`, `bookmarks/`) that **no enabled
+Each whole module directory (`repos/`, `tasks/`, `notes/`, `bookmarks/`) that **no
 provider backs anymore** — the module is off for the local provider and no remote provider
-implements it with the module enabled. This is the headline that an entire top-level directory
+(paused or not) implements it with the module enabled. This is the headline that an entire top-level directory
 is now stale; the per-subtree entries in `repos`/`tasks` still detail what's inside it.
 
 ```json

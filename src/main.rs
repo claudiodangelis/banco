@@ -12,7 +12,7 @@ mod template;
 mod tidy;
 mod tui;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use anyhow::Context;
@@ -296,8 +296,8 @@ fn provider_list(root: &Path) -> anyhow::Result<()> {
 /// enabled when there's no config or no local entry. A local entry with
 /// `enabled: false` is treated as "every module disabled" — the modules still
 /// own their directories (so `check` won't flag them) but are skipped for
-/// init/context/browse and refused by `find_module`, just like remote providers
-/// honor the `enabled` flag.
+/// init/context/browse and refused by `find_module`. Unlike a remote provider,
+/// where `enabled: false` only pauses syncing.
 fn local_provider(root: &Path) -> LocalProvider {
     let entry = config::load(root)
         .ok()
@@ -316,8 +316,8 @@ pub(crate) fn build_context(root: &Path) -> anyhow::Result<ContextOutput> {
     let local = local_provider(root);
     let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
     let mut providers = Vec::new();
-    // A fully-disabled local provider produces no modules; omit it entirely so
-    // it's treated like any other disabled provider rather than an empty shell.
+    // A fully-disabled local provider produces no modules; omit it entirely
+    // rather than listing an empty shell.
     let local_modules = local.context(root)?;
     if !local_modules.is_empty() {
         providers.push(ProviderContext {
@@ -334,13 +334,12 @@ pub(crate) fn build_context(root: &Path) -> anyhow::Result<ContextOutput> {
     Ok(ContextOutput { project, providers })
 }
 
+/// Every configured remote provider, paused ones (`enabled: false`) included:
+/// pausing only skips a provider on a bare `banco sync`, its data stays in use.
 fn remote_providers(root: &Path) -> anyhow::Result<Vec<Box<dyn Provider>>> {
     let project_config = config::load(root)?;
     let mut providers: Vec<Box<dyn Provider>> = Vec::new();
     for entry in project_config.providers {
-        if !entry.enabled {
-            continue;
-        }
         match entry.name.as_str() {
             "github" => providers.push(Box::new(GitHubProvider::new(entry))),
             "gitlab" => providers.push(Box::new(GitLabProvider::new(entry))),
@@ -457,15 +456,34 @@ fn run() -> anyhow::Result<()> {
             };
             println!("{}", json);
         }
-        Commands::Sync { provider, module, pattern, jobs } => {
+        Commands::Sync { provider, module, pattern, jobs, all } => {
             let providers = remote_providers(&root)?;
             if providers.is_empty() {
                 anyhow::bail!("no providers configured; run `banco provider add` first");
             }
+            let paused: HashSet<String> = config::load(&root)?
+                .providers
+                .iter()
+                .filter(|e| !e.enabled)
+                .map(|e| e.display_name().to_string())
+                .collect();
             let to_sync: Vec<&dyn Provider> = match &provider {
                 Some(name) => providers.iter().filter(|p| p.name() == name.as_str()).map(|p| p.as_ref()).collect(),
-                None => providers.iter().map(|p| p.as_ref()).collect(),
+                None => providers
+                    .iter()
+                    .filter(|p| {
+                        let skip = !all && paused.contains(p.name());
+                        if skip {
+                            println!("Skipping {} (paused; use --all to include it)", p.name());
+                        }
+                        !skip
+                    })
+                    .map(|p| p.as_ref())
+                    .collect(),
             };
+            if to_sync.is_empty() && provider.is_none() {
+                return Ok(());
+            }
             if to_sync.is_empty() {
                 anyhow::bail!("no provider named '{}'", provider.unwrap());
             }

@@ -87,11 +87,10 @@ enum Kind {
 }
 
 /// Everything tidy needs to know about a configured provider, derived from
-/// config alone (no network). Disabled providers are included — a disabled
-/// provider is itself a reason data is stale.
+/// config alone (no network). A disabled (`enabled: false`) remote provider is
+/// only paused — its data is still in use, so it is treated like any other.
 struct ProviderInfo {
     kind: Kind,
-    enabled: bool,
     /// Whether the tasks module is on (absent from `disabled_modules`).
     tasks_enabled: bool,
     /// Whether the repos module is on (absent from `disabled_modules`).
@@ -130,12 +129,13 @@ fn local_module_disabled(cfg: &config::ProjectConfig, module: &str) -> bool {
     }
 }
 
-/// Whether any *enabled* provider in the config still backs `module` with that
-/// module enabled. Drives the whole-module highlight: when this is false and the
+/// Whether any provider in the config still backs `module` with that module
+/// enabled. Drives the whole-module highlight: when this is false and the
 /// `module/` dir exists, nothing in the config produces that module anymore.
+/// A disabled `local` turns its modules off; a disabled remote is only paused.
 fn module_has_backing(cfg: &config::ProjectConfig, module: &str) -> bool {
     cfg.providers.iter().any(|e| {
-        e.enabled
+        (e.enabled || e.name != "local")
             && e.is_module_enabled(module)
             && provider_implements(&e.name, module)
     })
@@ -176,7 +176,6 @@ fn build_provider_map(cfg: &config::ProjectConfig) -> HashMap<String, ProviderIn
             entry.display_name().to_string(),
             ProviderInfo {
                 kind,
-                enabled: entry.enabled,
                 tasks_enabled: entry.is_module_enabled("tasks"),
                 repos_enabled: entry.is_module_enabled("repos"),
                 explicit,
@@ -287,7 +286,6 @@ fn detect_repos(
 
             let reason: Option<&'static str> = match info {
                 None => Some("provider_removed"),
-                Some(p) if !p.enabled => Some("provider_disabled"),
                 Some(p) if !p.repos_enabled => Some("module_disabled"),
                 Some(p) if p.kind == Kind::Other => None,
                 Some(p) => {
@@ -353,7 +351,6 @@ fn detect_tasks(
         // Provider-level reasons cover the whole tree in one finding.
         let provider_reason: Option<&'static str> = match info {
             None => Some("provider_removed"),
-            Some(p) if !p.enabled => Some("provider_disabled"),
             Some(p) if !p.tasks_enabled => Some("module_disabled"),
             Some(_) => None,
         };

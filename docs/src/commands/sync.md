@@ -3,8 +3,9 @@
 Pulls data from configured remote providers and writes it to the local filesystem.
 
 ```sh
-banco sync                                     # sync all configured providers
-banco sync <name>                              # sync a specific provider by name or alias
+banco sync                                     # sync all configured providers, except paused ones
+banco sync --all                               # sync all configured providers, paused ones included
+banco sync <name>                              # sync a specific provider by name or alias (even if paused)
 banco sync <name> --module tasks               # sync only the tasks module
 banco sync <name> --module repos               # sync only the repos module
 banco sync <name> --pattern "myorg/frontend"   # sync only projects matching regex
@@ -15,10 +16,18 @@ banco sync <name> --jobs 10                     # clone/fetch up to 10 repos at 
 
 Sync is non-destructive: it never deletes or overwrites existing files.
 
+## Paused providers
+
+A provider configured with `enabled: false` is *paused*: a bare `banco sync` skips it (printing a
+notice), while `banco sync --all` or `banco sync <name>` still syncs it. Its data stays in use —
+it is still listed by `context`, `browse` and the dashboard, and `tidy` does not flag it. This is
+useful for providers that are only reachable some of the time, e.g. behind a VPN.
+
 ## Options
 
 | Option | Description |
 | --- | --- |
+| `--all`, `-a` | Also sync paused providers (`enabled: false`). Has no effect when a provider name is given, since a named provider is always synced. |
 | `--module <tasks\|repos>` | Limit sync to a single module; skips the other. Useful when you only want to fetch issues without cloning repos, or vice versa. |
 | `--pattern <regex>` | Only sync projects whose path (`owner/repo` for GitHub, `namespace/project` for GitLab, the project path for Gerrit) matches this regex. Applied on top of the project list already defined in the provider config. Not applicable to Jira. |
 | `--jobs <n>`, `-j <n>` | Number of repos to clone/fetch concurrently. Defaults to `6`. Repo syncing is network-bound, so this is a small fixed value rather than something derived from CPU cores — raising it mainly risks tripping the remote's connection or rate limits. |

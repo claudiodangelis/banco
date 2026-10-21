@@ -1424,7 +1424,7 @@ fn show_config_editor(stdout: &mut impl Write, root: &Path) -> anyhow::Result<bo
             };
             let mut status = String::new();
             if !entry.enabled {
-                status.push_str("  ✗ off");
+                status.push_str(if entry.name == "local" { "  ✗ off" } else { "  ⏸ paused" });
             }
             let issues = entry_issues(entry);
             if !issues.is_empty() {
@@ -1562,8 +1562,13 @@ fn enabled_providers(root: &Path) -> String {
         names.push("local".to_string());
     }
     for p in &cfg.providers {
-        if p.enabled && p.name != "local" {
+        if p.name == "local" {
+            continue;
+        }
+        if p.enabled {
             names.push(p.display_name().to_string());
+        } else {
+            names.push(format!("{} (paused)", p.display_name()));
         }
     }
     if names.is_empty() {
