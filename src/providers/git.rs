@@ -254,10 +254,23 @@ pub struct RepoStatus {
     pub unmerged_branches: usize,
 }
 
+/// When set, `repo_item` skips the per-repo git calls. `banco serve` sets it:
+/// it rebuilds the context on every page, and with hundreds of repos the git
+/// status checks cost seconds per request.
+static SKIP_REPO_STATUS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn skip_repo_status() {
+    SKIP_REPO_STATUS.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Build a repos-module context item annotated with the working copy's branch,
 /// dirtiness, and unmerged-branch count. Shared by every provider's repos module.
 pub fn repo_item(name: String, repo_path: &Path) -> serde_json::Value {
-    let status = repo_status(repo_path);
+    let status = if SKIP_REPO_STATUS.load(std::sync::atomic::Ordering::Relaxed) {
+        None
+    } else {
+        repo_status(repo_path)
+    };
     serde_json::json!({
         "name": name,
         "branch": status.as_ref().and_then(|s| s.branch.clone()),

@@ -18,6 +18,7 @@ const FAVICON: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
 </svg>"##;
 
 pub fn serve(root: &Path, bind: &str, port: u16, open: bool) -> anyhow::Result<()> {
+    crate::providers::git::skip_repo_status();
     let addr = format!("{bind}:{port}");
     let server = Server::http(&addr)
         .map_err(|e| anyhow::anyhow!("failed to bind {addr}: {e}"))?;
@@ -747,13 +748,38 @@ fn project_name(root: &Path) -> &str {
     root.file_name().and_then(|s| s.to_str()).unwrap_or("?")
 }
 
-/// Module → provider → items tree. Built from the context, so disabled modules
-/// and a fully-disabled local provider are already absent.
+/// The whole sidebar: project header with the config/theme/hide buttons, the
+/// search field, and the scrollable module tree.
 fn render_sidebar(root: &Path) -> String {
     let mut out = format!(
-        "<div class=\"sb-head\"><a href=\"/\"><img src=\"/favicon.svg\" alt=\"\"><span><span class=\"brand\">banco</span>: {}</span></a></div>",
-        esc(project_name(root))
+        r#"<div class="sb-head">
+  <a class="sb-project" href="/" title="Dashboard"><img src="/favicon.svg" alt=""><span>{project}</span></a>
+  <button class="icon-btn" onclick="bancoShowConfig()" title="Configuration" aria-label="Configuration">{GEAR_SVG}</button>
+  <button class="icon-btn theme-toggle" onclick="bancoToggleTheme()" title="Toggle theme" aria-label="Toggle theme"></button>
+  <button class="icon-btn" onclick="bancoToggleSidebar()" title="Hide sidebar" aria-label="Hide sidebar" aria-controls="sidebar">{PANEL_SVG}</button>
+</div>
+<form class="sb-search" action="/search" method="get" role="search">
+  <input id="sb-q" name="q" type="search" placeholder="Search…" autocomplete="off" aria-label="Search notes, tasks, and repos">
+  <kbd>/</kbd>
+</form>
+<div class="sb-scroll" id="sb-scroll">"#,
+        project = esc(project_name(root)),
     );
+    out.push_str(&render_tree(root));
+    out.push_str("</div>");
+    out
+}
+
+/// Gear icon for the configuration button.
+const GEAR_SVG: &str = r#"<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>"#;
+
+/// Panel icon for the sidebar show/hide buttons.
+const PANEL_SVG: &str = r#"<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" stroke-width="1.3"/></svg>"#;
+
+/// Module → provider → items tree. Built from the context, so disabled modules
+/// and a fully-disabled local provider are already absent.
+fn render_tree(root: &Path) -> String {
+    let mut out = String::new();
     let ctx = match crate::build_context(root) {
         Ok(c) => c,
         Err(e) => {
@@ -1237,46 +1263,56 @@ fn page(root: &Path, title: &str, body: &str) -> String {
     if (matchMedia("(max-width: 800px)").matches || localStorage.getItem("banco-sidebar") === "hidden") sb = "hidden";
   }} catch (e) {{}}
   document.documentElement.setAttribute("data-sidebar", sb);
+  try {{
+    var w = parseInt(localStorage.getItem("banco-sidebar-width"), 10);
+    if (w >= 180 && w <= 640) document.documentElement.style.setProperty("--sb-w", w + "px");
+  }} catch (e) {{}}
 }})();
 </script>
 <style>
-:root {{ --accent: {ORANGE}; --sb-w: 280px; --tb-h: 48px; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
+:root {{ --accent: {ORANGE}; --sb-w: 280px; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }}
 [data-theme="dark"] {{ --bg: #0f1115; --fg: #e6e6e6; --muted: #8a8f98; --card: #171a21; --border: #262b34; --code-bg: #0f1115; --on-accent: #0f1115; --side: #12151b; --hover: #1c2129; }}
 [data-theme="light"] {{ --bg: #fbfbfa; --fg: #1f2328; --muted: #6b7280; --card: #ffffff; --border: #e2e4e8; --code-bg: #f3f4f6; --on-accent: #ffffff; --side: #f4f4f2; --hover: #e9e9e6; }}
 * {{ box-sizing: border-box; }}
-body {{ margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
-main {{ max-width: 900px; margin: 0 auto; padding: calc(var(--tb-h) + 1.75rem) 1.75rem 4rem; }}
-
-/* top bar */
-.topbar {{ position: fixed; top: 0; left: 0; right: 0; height: var(--tb-h); z-index: 70; display: flex; align-items: center; gap: .4rem; padding: 0 .6rem; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }}
-.icon-btn {{ display: inline-flex; align-items: center; justify-content: center; height: 32px; min-width: 32px; padding: 0 .45rem; background: transparent; color: var(--muted); border: 0; border-radius: 6px; font-size: .95rem; line-height: 1; cursor: pointer; }}
+body {{ margin: 0; background: var(--bg); color: var(--fg); font: 1rem/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+main {{ max-width: 900px; margin: 0 auto; padding: 2rem 1.75rem 4rem; }}
+.icon-btn {{ display: inline-flex; align-items: center; justify-content: center; flex: none; height: 28px; min-width: 28px; padding: 0 .35rem; background: transparent; color: var(--muted); border: 0; border-radius: 6px; font-size: .95rem; line-height: 1; cursor: pointer; }}
 .icon-btn:hover {{ color: var(--accent); background: var(--hover); }}
-.tb-brand {{ display: none; align-items: center; gap: .4rem; font-weight: 700; text-decoration: none; margin-right: .2rem; }}
-.tb-brand img {{ width: 18px; height: 18px; }}
-[data-sidebar="hidden"] .tb-brand {{ display: inline-flex; }}
-.tb-title {{ color: var(--muted); font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-.tb-spacer {{ flex: 1; }}
-.tb-search {{ display: inline-flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-width: 200px; padding: .25rem .4rem .25rem .7rem; margin-right: .2rem; color: var(--muted); background: var(--card); border: 1px solid var(--border); border-radius: 6px; font-size: .85rem; text-decoration: none; }}
-.tb-search:hover {{ color: var(--fg); border-color: var(--accent); }}
 kbd {{ font: 11px/1 var(--mono); color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: .15rem .35rem; }}
 
-/* sidebar */
-.sidebar {{ position: fixed; top: var(--tb-h); bottom: 0; left: 0; width: var(--sb-w); z-index: 65; overflow-y: auto; padding: .6rem .5rem 3rem; background: var(--side); border-right: 1px solid var(--border); font-size: .875rem; transition: transform .2s ease; }}
+/* sidebar: header + search stay pinned, the tree scrolls */
+.sidebar {{ position: fixed; top: 0; bottom: 0; left: 0; width: var(--sb-w); z-index: 65; display: flex; flex-direction: column; background: var(--side); border-right: 1px solid var(--border); font-size: .875rem; transition: transform .2s ease; }}
 [data-sidebar="hidden"] .sidebar {{ transform: translateX(-100%); }}
+.sb-scroll {{ flex: 1; min-height: 0; overflow-y: auto; padding: .25rem .5rem 3rem; }}
 .content {{ margin-left: var(--sb-w); transition: margin-left .2s ease; }}
 [data-sidebar="hidden"] .content {{ margin-left: 0; }}
+.sb-open {{ position: fixed; top: .6rem; left: .6rem; z-index: 60; display: none; background: var(--card); border: 1px solid var(--border); }}
+[data-sidebar="hidden"] .sb-open {{ display: inline-flex; }}
+.sb-resizer {{ position: fixed; top: 0; bottom: 0; left: calc(var(--sb-w) - 3px); width: 6px; z-index: 66; cursor: col-resize; }}
+.sb-resizer::after {{ content: ""; position: absolute; top: 0; bottom: 0; left: 2px; width: 2px; background: transparent; transition: background .15s; }}
+.sb-resizer:hover::after, .resizing .sb-resizer::after {{ background: var(--accent); }}
+[data-sidebar="hidden"] .sb-resizer {{ display: none; }}
+.resizing, .resizing * {{ cursor: col-resize !important; user-select: none !important; }}
+.resizing .sidebar, .resizing .content {{ transition: none; }}
 .scrim {{ display: none; }}
 @media (max-width: 800px) {{
   .content {{ margin-left: 0; }}
+  main {{ padding-top: 3.25rem; }}
+  .sb-resizer {{ display: none; }}
   [data-sidebar="shown"] .sidebar {{ box-shadow: 6px 0 24px rgba(0,0,0,.35); }}
-  [data-sidebar="shown"] .scrim {{ display: block; position: fixed; inset: var(--tb-h) 0 0 0; z-index: 64; background: rgba(0,0,0,.35); }}
-  .tb-search {{ min-width: 0; gap: 0; padding: .25rem .4rem; }}
-  .tb-search .lbl {{ display: none; }}
+  [data-sidebar="shown"] .scrim {{ display: block; position: fixed; inset: 0; z-index: 64; background: rgba(0,0,0,.35); }}
 }}
-.sb-head {{ padding: .2rem .5rem .7rem; margin-bottom: .4rem; border-bottom: 1px solid var(--border); font-weight: 600; font-size: .95rem; }}
-.sb-head a {{ display: flex; align-items: center; gap: .5rem; color: var(--fg); text-decoration: none; }}
-.sb-head a:hover {{ color: var(--accent); }}
-.sb-head img {{ width: 18px; height: 18px; }}
+.sb-head {{ display: flex; align-items: center; gap: .1rem; padding: .55rem .5rem .35rem .75rem; }}
+.sb-project {{ display: flex; align-items: center; gap: .5rem; flex: 1; min-width: 0; color: var(--fg); font-weight: 600; font-size: .95rem; text-decoration: none; }}
+.sb-project span {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+.sb-project:hover {{ color: var(--accent); }}
+.sb-project img {{ width: 18px; height: 18px; flex: none; }}
+.sb-search {{ position: relative; margin: .25rem .6rem .6rem; }}
+.sb-search input {{ width: 100%; padding: .35rem 2rem .35rem .6rem; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: .85rem; }}
+.sb-search input:focus {{ outline: none; border-color: var(--accent); }}
+.sb-search input::-webkit-search-cancel-button {{ display: none; }}
+.sb-search kbd {{ position: absolute; right: .4rem; top: 50%; transform: translateY(-50%); pointer-events: none; }}
+.sb-search input:focus + kbd {{ display: none; }}
 .sb-pad {{ padding: 0 .5rem; }}
 .tree summary {{ display: flex; align-items: center; gap: .35rem; padding: .15rem .4rem; border-radius: 5px; white-space: nowrap; }}
 .tree summary:hover {{ background: var(--hover); }}
@@ -1401,20 +1437,9 @@ li a:hover {{ color: var(--accent); border-color: var(--accent); }}
 </style>
 </head>
 <body>
-<header class="topbar">
-  <button class="icon-btn" onclick="bancoToggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar" aria-controls="sidebar">
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" stroke-width="1.3"/></svg>
-  </button>
-  <a class="tb-brand" href="/"><img src="/favicon.svg" alt=""><span class="brand">banco</span></a>
-  <span class="tb-title">{title}</span>
-  <span class="tb-spacer"></span>
-  <a class="tb-search" href="/search"><span class="lbl">Search</span><kbd>/</kbd></a>
-  <button class="icon-btn" onclick="bancoShowConfig()" title="Configuration" aria-label="Configuration">
-    <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-  </button>
-  <button class="icon-btn theme-toggle" onclick="bancoToggleTheme()" title="Toggle theme" aria-label="Toggle theme"></button>
-</header>
+<button class="icon-btn sb-open" onclick="bancoToggleSidebar()" title="Show sidebar" aria-label="Show sidebar" aria-controls="sidebar">{PANEL_SVG}</button>
 <aside class="sidebar" id="sidebar">{sidebar}</aside>
+<div class="sb-resizer" id="sb-resizer" title="Drag to resize · double-click to reset" role="separator" aria-orientation="vertical"></div>
 <div class="scrim" onclick="bancoToggleSidebar()"></div>
 <div class="content"><main>{body}</main></div>
 <dialog id="cfg-dialog" class="cfg-dialog">
@@ -1431,6 +1456,34 @@ function bancoToggleSidebar() {{
     try {{ localStorage.setItem("banco-sidebar", next); }} catch (e) {{}}
   }}
 }}
+
+// Sidebar width: drag the right edge; double-click resets to the default.
+(function () {{
+  var handle = document.getElementById("sb-resizer");
+  var root = document.documentElement;
+  var KEY = "banco-sidebar-width";
+  function clamp(w) {{ return Math.max(180, Math.min(640, w, innerWidth - 320)); }}
+  handle.addEventListener("pointerdown", function (e) {{
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    root.classList.add("resizing");
+    function move(ev) {{ root.style.setProperty("--sb-w", clamp(ev.clientX) + "px"); }}
+    function up(ev) {{
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+      root.classList.remove("resizing");
+      try {{ localStorage.setItem(KEY, String(parseInt(getComputedStyle(root).getPropertyValue("--sb-w"), 10))); }} catch (e) {{}}
+    }}
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  }});
+  handle.addEventListener("dblclick", function () {{
+    root.style.removeProperty("--sb-w");
+    try {{ localStorage.removeItem(KEY); }} catch (e) {{}}
+  }});
+}})();
 
 function bancoShowConfig() {{
   var dlg = document.getElementById("cfg-dialog");
@@ -1450,6 +1503,7 @@ document.getElementById("cfg-dialog").addEventListener("click", function (e) {{
 // expand its ancestors, and keep the scroll position across navigation.
 (function () {{
   var sb = document.getElementById("sidebar");
+  var scroller = document.getElementById("sb-scroll") || sb;
   var KEY = "banco-tree";
   var state;
   try {{ state = JSON.parse(localStorage.getItem(KEY) || "{{}}"); }} catch (e) {{ state = {{}}; }}
@@ -1480,14 +1534,14 @@ document.getElementById("cfg-dialog").addEventListener("click", function (e) {{
 
   try {{
     var y = sessionStorage.getItem("banco-sb-scroll");
-    if (y) sb.scrollTop = +y;
+    if (y) scroller.scrollTop = +y;
   }} catch (e) {{}}
   if (active) {{
-    var r = active.getBoundingClientRect(), sr = sb.getBoundingClientRect();
+    var r = active.getBoundingClientRect(), sr = scroller.getBoundingClientRect();
     if (r.top < sr.top || r.bottom > sr.bottom) active.scrollIntoView({{ block: "center" }});
   }}
   addEventListener("pagehide", function () {{
-    try {{ sessionStorage.setItem("banco-sb-scroll", String(sb.scrollTop)); }} catch (e) {{}}
+    try {{ sessionStorage.setItem("banco-sb-scroll", String(scroller.scrollTop)); }} catch (e) {{}}
   }});
 }})();
 </script>
@@ -1556,15 +1610,14 @@ document.addEventListener("keydown", function (e) {{
   var el = document.activeElement;
   var tag = el && el.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || (el && el.isContentEditable)) return;
-  var input = document.getElementById("q");
-  if (input) {{
-    e.preventDefault();
-    input.focus();
-    input.select();
-  }} else {{
-    e.preventDefault();
-    location.href = "/search";
-  }}
+  // The search page has its own live input; elsewhere use the sidebar field,
+  // revealing the sidebar first if it is hidden.
+  var input = document.getElementById("q") || document.getElementById("sb-q");
+  if (!input) return;
+  e.preventDefault();
+  if (input.id === "sb-q" && document.documentElement.getAttribute("data-sidebar") === "hidden") bancoToggleSidebar();
+  input.focus();
+  input.select();
 }});
 </script>
 </body>
