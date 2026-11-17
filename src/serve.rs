@@ -41,7 +41,16 @@ pub fn serve(root: &Path, bind: &str, port: u16, open: bool) -> anyhow::Result<(
 
         let response = match path {
             "/" => html_response(render_dashboard(root)),
-            "/search" => html_response(render_search_page()),
+            "/search" => html_response(render_search_page(root)),
+            "/config" => {
+                // `partial=1` returns just the fragment, for the gear dialog.
+                if query_param(query, "partial").as_deref() == Some("1") {
+                    html_response(render_config(root))
+                } else {
+                    let body = format!("<h1>Configuration</h1>{}", render_config(root));
+                    html_response(page(root, "Configuration", &body))
+                }
+            }
             "/favicon.svg" => svg_response(FAVICON),
             "/item" => match handle_item(root, query) {
                 Ok(body) => html_response(body),
@@ -100,8 +109,7 @@ fn handle_item(root: &Path, query: &str) -> Result<String, u16> {
 
     let rel_attr = esc(&rel);
     let inner = format!(
-        r##"<a href="/" class="back">← dashboard</a>
-<h1>{title}</h1>
+        r##"<h1>{title}</h1>
 <div class="meta">{meta}</div>
 <article class="markdown">{rendered}</article>
 <div class="goto">
@@ -181,7 +189,7 @@ poll();
 </script>"##,
         title = esc(&title),
     );
-    Ok(page(&title, &inner))
+    Ok(page(root, &title, &inner))
 }
 
 fn handle_mtime(root: &Path, query: &str) -> Result<String, u16> {
@@ -282,8 +290,7 @@ fn handle_log(root: &Path, query: &str) -> Result<String, u16> {
     };
 
     let inner = format!(
-        "<a href=\"/\" class=\"back\">← dashboard</a>\
-         <h1>{title} <span class=\"count\">history</span></h1>\
+        "<h1>{title} <span class=\"count\">history</span></h1>\
          {capped}{rows}\
          <div class=\"goto\">\
            <button class=\"copy-path\" data-path=\"{rel}\" onclick=\"bancoCopyPath(this)\">Copy path</button>\
@@ -291,7 +298,7 @@ fn handle_log(root: &Path, query: &str) -> Result<String, u16> {
         title = esc(&name),
         rel = esc(&rel),
     );
-    Ok(page(&name, &inner))
+    Ok(page(root, &name, &inner))
 }
 
 /// Resolve `rel` against `root`, ensuring the result stays inside `root`, is an
@@ -465,9 +472,8 @@ fn make_snippet(body: &str, pos: Option<usize>, needle: &str) -> String {
     s
 }
 
-fn render_search_page() -> String {
-    let inner = r#"<a href="/" class="back">← dashboard</a>
-<h1>Search</h1>
+fn render_search_page(root: &Path) -> String {
+    let inner = r#"<h1>Search</h1>
 <input id="q" class="search-input" type="search" placeholder="Search notes, tasks, and repos…" autofocus autocomplete="off">
 <div id="results"></div>
 <script>
@@ -504,20 +510,20 @@ input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(
 const initial = new URLSearchParams(location.search).get("q");
 if (initial) { input.value = initial; run(); }
 </script>"#;
-    page("Search", inner)
+    page(root, "Search", inner)
 }
 
 // ── dashboard ────────────────────────────────────────────────────────────────
 
 fn render_dashboard(root: &Path) -> String {
-    let project = root.file_name().and_then(|s| s.to_str()).unwrap_or("?");
+    let project = project_name(root);
     let ctx = match crate::build_context(root) {
         Ok(c) => c,
-        Err(e) => return page("banco", &format!("<p class=\"err\">failed to build context: {}</p>", esc(&format!("{e:#}")))),
+        Err(e) => return page(root, project, &format!("<p class=\"err\">failed to build context: {}</p>", esc(&format!("{e:#}")))),
     };
 
     let mut body = format!(
-        "<h1><span class=\"brand\">banco</span> {}</h1><p><a class=\"nav\" href=\"/search\">Search →</a></p>",
+        "<h1><span class=\"brand\">banco</span> {}</h1>",
         esc(project)
     );
 
@@ -529,7 +535,7 @@ fn render_dashboard(root: &Path) -> String {
 
     if providers.is_empty() {
         body.push_str("<p class=\"muted\">No items yet.</p>");
-        return page("banco", &body);
+        return page(root, project, &body);
     }
 
     for provider in providers {
@@ -555,7 +561,7 @@ fn render_dashboard(root: &Path) -> String {
         body.push_str("</details>");
     }
 
-    page("banco", &body)
+    page(root, project, &body)
 }
 
 fn render_module(root: &Path, provider_name: &str, module: &ModuleContext) -> String {
@@ -567,16 +573,20 @@ fn render_module(root: &Path, provider_name: &str, module: &ModuleContext) -> St
     }
 }
 
+/// The `/item` URL for a markdown-backed item, or `None` when it has no file.
+fn item_href(root: &Path, provider_name: &str, module_name: &str, item: &serde_json::Value) -> Option<String> {
+    let path = resolve_item_path(root, provider_name, module_name, item)?;
+    let rel = path.strip_prefix(root).ok()?.to_str()?;
+    Some(format!("/item?path={}", url_encode(rel)))
+}
+
+fn repo_href(provider_name: &str, name: &str) -> String {
+    format!("/log?path={}", url_encode(&format!("repos/{provider_name}/{name}")))
+}
+
 fn item_link(root: &Path, provider_name: &str, module: &ModuleContext, item: &serde_json::Value, label: &str) -> String {
-    match resolve_item_path(root, provider_name, &module.name, item) {
-        Some(path) => match path.strip_prefix(root).ok().and_then(|p| p.to_str()) {
-            Some(rel) => format!(
-                "<li><a href=\"/item?path={}\">{}</a></li>",
-                url_encode(rel),
-                esc(label)
-            ),
-            None => format!("<li>{}</li>", esc(label)),
-        },
+    match item_href(root, provider_name, &module.name, item) {
+        Some(href) => format!("<li><a href=\"{href}\">{}</a></li>", esc(label)),
         None => format!("<li>{}</li>", esc(label)),
     }
 }
@@ -702,15 +712,389 @@ fn render_repos(provider_name: &str, module: &ModuleContext) -> String {
     for item in &module.items {
         if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
             let label = repo_item_label(item, name);
-            let rel = format!("repos/{provider_name}/{name}");
             out.push_str(&format!(
-                "<li><a href=\"/log?path={}\">{}</a></li>",
-                url_encode(&rel),
+                "<li><a href=\"{}\">{}</a></li>",
+                repo_href(provider_name, name),
                 esc(&label)
             ));
         }
     }
     out.push_str("</ul>");
+    out
+}
+
+// ── sidebar ──────────────────────────────────────────────────────────────────
+
+/// Top-level module order in the sidebar; modules not listed follow, in the
+/// order they first appear in the context.
+const MODULE_ORDER: &[&str] = &["repos", "tasks", "notes", "bookmarks"];
+
+/// Display names of remote providers paused with `enabled: false`. Their data
+/// stays in the context; the sidebar just flags them.
+fn paused_providers(root: &Path) -> std::collections::HashSet<String> {
+    crate::config::load(root)
+        .map(|c| {
+            c.providers
+                .iter()
+                .filter(|e| !e.enabled && e.name != "local")
+                .map(|e| e.display_name().to_string())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn project_name(root: &Path) -> &str {
+    root.file_name().and_then(|s| s.to_str()).unwrap_or("?")
+}
+
+/// Module → provider → items tree. Built from the context, so disabled modules
+/// and a fully-disabled local provider are already absent.
+fn render_sidebar(root: &Path) -> String {
+    let mut out = format!(
+        "<div class=\"sb-head\"><a href=\"/\"><img src=\"/favicon.svg\" alt=\"\"><span><span class=\"brand\">banco</span>: {}</span></a></div>",
+        esc(project_name(root))
+    );
+    let ctx = match crate::build_context(root) {
+        Ok(c) => c,
+        Err(e) => {
+            out.push_str(&format!("<p class=\"err sb-pad\">{}</p>", esc(&format!("{e:#}"))));
+            return out;
+        }
+    };
+    let paused = paused_providers(root);
+
+    let mut modules: Vec<&str> = Vec::new();
+    for p in &ctx.providers {
+        for m in &p.modules {
+            if !modules.contains(&m.name.as_str()) {
+                modules.push(&m.name);
+            }
+        }
+    }
+    modules.sort_by_key(|m| MODULE_ORDER.iter().position(|o| o == m).unwrap_or(MODULE_ORDER.len()));
+
+    if modules.is_empty() {
+        out.push_str("<p class=\"muted sb-pad\">No modules enabled.</p>");
+        return out;
+    }
+
+    out.push_str("<nav class=\"tree\">");
+    for module in modules {
+        let entries: Vec<(&str, &ModuleContext)> = ctx
+            .providers
+            .iter()
+            .filter_map(|p| p.modules.iter().find(|m| m.name == module).map(|m| (p.name.as_str(), m)))
+            .collect();
+        let total: usize = entries.iter().map(|(_, m)| m.items.len()).sum();
+        out.push_str(&format!(
+            "<details class=\"t-module\" data-tree=\"m:{key}\" open><summary><span class=\"t-name\">{key}/</span><span class=\"count\">{total}</span></summary>",
+            key = esc(module),
+        ));
+        for (provider, m) in entries {
+            let badge = if paused.contains(provider) {
+                "<span class=\"pill warn\" title=\"enabled: false — skipped by a bare banco sync\">paused</span>"
+            } else {
+                ""
+            };
+            out.push_str(&format!(
+                "<details class=\"t-provider\" data-tree=\"p:{mkey}:{pkey}\" open><summary><span class=\"t-name\">{pkey}</span>{badge}<span class=\"count\">{n}</span></summary>",
+                mkey = esc(module),
+                pkey = esc(provider),
+                n = m.items.len(),
+            ));
+            if m.items.is_empty() {
+                out.push_str("<div class=\"t-empty\">empty</div>");
+            } else {
+                out.push_str(&match module {
+                    "tasks" => tree_tasks(root, provider, m),
+                    "notes" => tree_notes(root, provider, m),
+                    "bookmarks" => tree_bookmarks(provider, m),
+                    _ => tree_repos(provider, m),
+                });
+            }
+            out.push_str("</details>");
+        }
+        out.push_str("</details>");
+    }
+    out.push_str("</nav>");
+    out
+}
+
+fn is_closed_status(status: &str) -> bool {
+    status.eq_ignore_ascii_case("done") || status.eq_ignore_ascii_case("closed")
+}
+
+fn tree_leaf(href: Option<String>, label: &str, class: &str) -> String {
+    match href {
+        Some(h) => format!("<li><a href=\"{}\" class=\"{class}\" title=\"{t}\">{t}</a></li>", esc(&h), t = esc(label)),
+        None => format!("<li><span class=\"t-leaf {class}\" title=\"{t}\">{t}</span></li>", t = esc(label)),
+    }
+}
+
+fn tree_group(id: &str, title: &str, open: bool, count: usize, leaves: &str) -> String {
+    format!(
+        "<details class=\"t-group\" data-tree=\"{id}\"{open}><summary><span class=\"t-name\">{title}</span><span class=\"count\">{count}</span></summary><ul>{leaves}</ul></details>",
+        id = esc(id),
+        title = esc(title),
+        open = if open { " open" } else { "" },
+    )
+}
+
+/// Tasks grouped by project for remote providers (which carry one), otherwise
+/// by status. Done/closed status groups start collapsed; closed items inside a
+/// project group are dimmed.
+fn tree_tasks(root: &Path, provider: &str, module: &ModuleContext) -> String {
+    let status_of = |i: &serde_json::Value| i.get("status").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let leaf = |i: &serde_json::Value| -> String {
+        let Some(name) = i.get("name").and_then(|v| v.as_str()) else { return String::new() };
+        let id = i.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        let label = if id.is_empty() { display_name(name).to_string() } else { format!("{id} {}", display_name(name)) };
+        let class = if is_closed_status(&status_of(i)) { "dim" } else { "" };
+        tree_leaf(item_href(root, provider, "tasks", i), &label, class)
+    };
+
+    let mut out = String::new();
+    let has_projects = module.items.iter().any(|i| item_project_key(i).is_some());
+    let (keys, key_of): (Vec<String>, Box<dyn Fn(&serde_json::Value) -> String>) = if has_projects {
+        let mut seen = std::collections::HashSet::new();
+        let mut projects: Vec<String> = module.items.iter().filter_map(item_project_key).filter(|p| seen.insert(p.clone())).collect();
+        projects.sort();
+        (projects, Box::new(|i| item_project_key(i).unwrap_or_default()))
+    } else {
+        let statuses = sorted_statuses(module.items.iter().map(status_of).filter(|s| !s.is_empty()));
+        (statuses, Box::new(status_of))
+    };
+
+    // Items with no group key sit directly under the provider.
+    let loose: String = module.items.iter().filter(|i| key_of(i).is_empty()).map(leaf).collect();
+    if !loose.is_empty() {
+        out.push_str(&format!("<ul>{loose}</ul>"));
+    }
+    for key in &keys {
+        let items: Vec<&serde_json::Value> = module.items.iter().filter(|i| &key_of(i) == key).collect();
+        let leaves: String = items.iter().map(|i| leaf(i)).collect();
+        let open = has_projects || !is_closed_status(key);
+        out.push_str(&tree_group(&format!("g:tasks:{provider}:{key}"), key, open, items.len(), &leaves));
+    }
+    out
+}
+
+/// Unlabeled notes first, then one group per label (subdirectory).
+fn tree_notes(root: &Path, provider: &str, module: &ModuleContext) -> String {
+    let label_of = |i: &serde_json::Value| i.get("label").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let leaf = |i: &serde_json::Value| -> String {
+        match i.get("name").and_then(|v| v.as_str()) {
+            Some(name) => tree_leaf(item_href(root, provider, "notes", i), name, ""),
+            None => String::new(),
+        }
+    };
+
+    let mut out = String::new();
+    let loose: String = module.items.iter().filter(|i| label_of(i).is_empty()).map(leaf).collect();
+    if !loose.is_empty() {
+        out.push_str(&format!("<ul>{loose}</ul>"));
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut labels: Vec<String> = module.items.iter().map(label_of).filter(|l| !l.is_empty() && seen.insert(l.clone())).collect();
+    labels.sort();
+    for label in &labels {
+        let items: Vec<&serde_json::Value> = module.items.iter().filter(|i| &label_of(i) == label).collect();
+        let leaves: String = items.iter().map(|i| leaf(i)).collect();
+        out.push_str(&tree_group(&format!("g:notes:{provider}:{label}"), label, true, items.len(), &leaves));
+    }
+    out
+}
+
+/// Bookmarks in the `default` group sit directly under the provider; other
+/// group files become groups. Links open in a new tab.
+fn tree_bookmarks(provider: &str, module: &ModuleContext) -> String {
+    let group_of = |i: &serde_json::Value| {
+        let g = i.get("group").and_then(|v| v.as_str()).unwrap_or("");
+        if g == "default" { String::new() } else { g.to_string() }
+    };
+    let leaf = |i: &serde_json::Value| -> String {
+        let name = i.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let url = i.get("url").and_then(|v| v.as_str()).unwrap_or("");
+        if url.is_empty() {
+            tree_leaf(None, name, "")
+        } else {
+            format!(
+                "<li><a href=\"{u}\" rel=\"noreferrer\" target=\"_blank\" class=\"ext\" title=\"{u}\">{n}</a></li>",
+                u = esc(url),
+                n = esc(name),
+            )
+        }
+    };
+
+    let mut out = String::new();
+    let loose: String = module.items.iter().filter(|i| group_of(i).is_empty()).map(leaf).collect();
+    if !loose.is_empty() {
+        out.push_str(&format!("<ul>{loose}</ul>"));
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut groups: Vec<String> = module.items.iter().map(group_of).filter(|g| !g.is_empty() && seen.insert(g.clone())).collect();
+    groups.sort();
+    for group in &groups {
+        let items: Vec<&serde_json::Value> = module.items.iter().filter(|i| &group_of(i) == group).collect();
+        let leaves: String = items.iter().map(|i| leaf(i)).collect();
+        out.push_str(&tree_group(&format!("g:bookmarks:{provider}:{group}"), group, true, items.len(), &leaves));
+    }
+    out
+}
+
+fn tree_repos(provider: &str, module: &ModuleContext) -> String {
+    let leaves: String = module
+        .items
+        .iter()
+        .filter_map(|i| {
+            let name = i.get("name").and_then(|v| v.as_str())?;
+            Some(tree_leaf(Some(repo_href(provider, name)), &repo_item_label(i, name), ""))
+        })
+        .collect();
+    format!("<ul>{leaves}</ul>")
+}
+
+// ── configuration ────────────────────────────────────────────────────────────
+
+/// Config keys whose literal values are never shown. Env-var references
+/// (`$VAR`) are safe to show and are displayed with whether the var is set.
+fn is_secret_key(key: &str) -> bool {
+    let k = key.to_ascii_lowercase();
+    ["key", "token", "secret", "password", "passwd"].iter().any(|s| k.contains(s))
+}
+
+fn env_ref(s: &str) -> Option<&str> {
+    s.strip_prefix("${").and_then(|v| v.strip_suffix('}')).or_else(|| s.strip_prefix('$'))
+}
+
+fn config_value_html(key: &str, value: &serde_yaml::Value) -> String {
+    match value {
+        serde_yaml::Value::String(s) => {
+            if let Some(var) = env_ref(s) {
+                let set = std::env::var_os(var).is_some();
+                format!(
+                    "<code>{}</code><span class=\"env {cls}\">{label}</span>",
+                    esc(s),
+                    cls = if set { "ok" } else { "missing" },
+                    label = if set { "set" } else { "unset" },
+                )
+            } else if is_secret_key(key) {
+                "<span class=\"redacted\">redacted</span>".to_string()
+            } else {
+                format!("<code>{}</code>", esc(s))
+            }
+        }
+        serde_yaml::Value::Sequence(seq) => seq
+            .iter()
+            .map(|v| match v {
+                serde_yaml::Value::String(s) => format!("<code>{}</code>", esc(s)),
+                other => format!("<code>{}</code>", esc(serde_yaml::to_string(other).unwrap_or_default().trim())),
+            })
+            .collect(),
+        other => format!("<code>{}</code>", esc(serde_yaml::to_string(other).unwrap_or_default().trim())),
+    }
+}
+
+fn browse_html(b: &crate::config::BrowseConfig) -> String {
+    let mut s = format!("<code>{}</code>", esc(&b.command));
+    for a in &b.args {
+        s.push_str(&format!("<code>{}</code>", esc(a)));
+    }
+    s
+}
+
+/// Read-only view of `.banco/config.yml`: one card per provider with its
+/// state, modules (disabled ones struck through), and config values with
+/// secrets redacted. Returned as a fragment for both `/config` and the dialog.
+fn render_config(root: &Path) -> String {
+    let path = root.join(".banco/config.yml");
+    let mut out = String::from("<div class=\"cfg\">");
+    out.push_str("<div class=\"cfg-path\"><code>.banco/config.yml</code> · read-only</div>");
+
+    let mut cfg = match crate::config::load(root) {
+        Ok(c) => c,
+        Err(e) => {
+            out.push_str(&format!("<p class=\"err\">{}</p></div>", esc(&format!("{e:#}"))));
+            return out;
+        }
+    };
+    if !path.exists() {
+        out.push_str("<p class=\"muted\">No config file found: defaults apply (local provider, every module on).</p></div>");
+        return out;
+    }
+
+    if let Some(b) = &cfg.browse {
+        out.push_str(&format!(
+            "<section class=\"cfg-provider\"><header><strong>project</strong></header><div class=\"cfg-row\"><span class=\"k\">browse</span><span class=\"v\">{}</span></div></section>",
+            browse_html(b)
+        ));
+    }
+
+    for entry in &cfg.providers {
+        let is_local = entry.name == "local";
+        let (state, cls) = match (is_local, entry.enabled) {
+            (true, true) => ("enabled", "ok"),
+            (true, false) => ("disabled", "off"),
+            (false, true) => ("active", "ok"),
+            (false, false) => ("paused", "warn"),
+        };
+        out.push_str("<section class=\"cfg-provider\"><header>");
+        out.push_str(&format!("<strong>{}</strong>", esc(entry.display_name())));
+        if entry.alias.is_some() {
+            out.push_str(&format!("<span class=\"cfg-kind\">{}</span>", esc(&entry.name)));
+        }
+        out.push_str(&format!("<span class=\"pill {cls}\">{state}</span></header>"));
+
+        let modules = crate::provider_kind_modules(&entry.name);
+        if !modules.is_empty() {
+            let chips: String = modules
+                .iter()
+                .map(|m| {
+                    // Pausing a remote keeps its modules; disabling local turns them all off.
+                    let on = (entry.enabled || !is_local) && entry.is_module_enabled(m);
+                    format!(
+                        "<span class=\"chip{}\" title=\"{}\">{}</span>",
+                        if on { "" } else { " off" },
+                        if on { "enabled" } else { "disabled" },
+                        esc(m)
+                    )
+                })
+                .collect();
+            out.push_str(&format!("<div class=\"cfg-row\"><span class=\"k\">modules</span><span class=\"v\">{chips}</span></div>"));
+        }
+
+        let mut keys: Vec<&String> = entry.config.keys().collect();
+        keys.sort();
+        for key in keys {
+            out.push_str(&format!(
+                "<div class=\"cfg-row\"><span class=\"k\">{}</span><span class=\"v\">{}</span></div>",
+                esc(key),
+                config_value_html(key, &entry.config[key])
+            ));
+        }
+        if let Some(b) = &entry.browse {
+            out.push_str(&format!("<div class=\"cfg-row\"><span class=\"k\">browse</span><span class=\"v\">{}</span></div>", browse_html(b)));
+        }
+        out.push_str("</section>");
+    }
+
+    // Effective config re-serialized (comments are not preserved), with
+    // literal secrets replaced so it is safe to display.
+    for entry in &mut cfg.providers {
+        for (key, value) in entry.config.iter_mut() {
+            if let serde_yaml::Value::String(s) = value {
+                if is_secret_key(key) && env_ref(s).is_none() {
+                    *s = "<redacted>".to_string();
+                }
+            }
+        }
+    }
+    let yaml = serde_yaml::to_string(&cfg).unwrap_or_default();
+    out.push_str(&format!(
+        "<details class=\"cfg-raw\"><summary>Effective YAML</summary><pre><code>{}</code></pre></details>",
+        esc(&yaml)
+    ));
+    out.push_str("</div>");
     out
 }
 
@@ -824,7 +1208,9 @@ fn json_str(s: &str) -> String {
 
 // ── HTML shell / responses ─────────────────────────────────────────────────
 
-fn page(title: &str, body: &str) -> String {
+fn page(root: &Path, title: &str, body: &str) -> String {
+    let title = esc(title);
+    let sidebar = render_sidebar(root);
     format!(
         r#"<!DOCTYPE html>
 <html lang="en">
@@ -844,15 +1230,101 @@ fn page(title: &str, body: &str) -> String {
   }} catch (e) {{
     document.documentElement.setAttribute("data-theme", "dark");
   }}
+  // Sidebar visibility is set before first paint to avoid a flash. Narrow
+  // screens always start hidden (the sidebar overlays content there).
+  var sb = "shown";
+  try {{
+    if (matchMedia("(max-width: 800px)").matches || localStorage.getItem("banco-sidebar") === "hidden") sb = "hidden";
+  }} catch (e) {{}}
+  document.documentElement.setAttribute("data-sidebar", sb);
 }})();
 </script>
 <style>
-:root {{ --accent: {ORANGE}; }}
-[data-theme="dark"] {{ --bg: #0f1115; --fg: #e6e6e6; --muted: #8a8f98; --card: #171a21; --border: #262b34; --code-bg: #0f1115; --on-accent: #0f1115; }}
-[data-theme="light"] {{ --bg: #fbfbfa; --fg: #1f2328; --muted: #6b7280; --card: #ffffff; --border: #e2e4e8; --code-bg: #f3f4f6; --on-accent: #ffffff; }}
+:root {{ --accent: {ORANGE}; --sb-w: 280px; --tb-h: 48px; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
+[data-theme="dark"] {{ --bg: #0f1115; --fg: #e6e6e6; --muted: #8a8f98; --card: #171a21; --border: #262b34; --code-bg: #0f1115; --on-accent: #0f1115; --side: #12151b; --hover: #1c2129; }}
+[data-theme="light"] {{ --bg: #fbfbfa; --fg: #1f2328; --muted: #6b7280; --card: #ffffff; --border: #e2e4e8; --code-bg: #f3f4f6; --on-accent: #ffffff; --side: #f4f4f2; --hover: #e9e9e6; }}
 * {{ box-sizing: border-box; }}
 body {{ margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
-main {{ max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }}
+main {{ max-width: 900px; margin: 0 auto; padding: calc(var(--tb-h) + 1.75rem) 1.75rem 4rem; }}
+
+/* top bar */
+.topbar {{ position: fixed; top: 0; left: 0; right: 0; height: var(--tb-h); z-index: 70; display: flex; align-items: center; gap: .4rem; padding: 0 .6rem; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }}
+.icon-btn {{ display: inline-flex; align-items: center; justify-content: center; height: 32px; min-width: 32px; padding: 0 .45rem; background: transparent; color: var(--muted); border: 0; border-radius: 6px; font-size: .95rem; line-height: 1; cursor: pointer; }}
+.icon-btn:hover {{ color: var(--accent); background: var(--hover); }}
+.tb-brand {{ display: none; align-items: center; gap: .4rem; font-weight: 700; text-decoration: none; margin-right: .2rem; }}
+.tb-brand img {{ width: 18px; height: 18px; }}
+[data-sidebar="hidden"] .tb-brand {{ display: inline-flex; }}
+.tb-title {{ color: var(--muted); font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.tb-spacer {{ flex: 1; }}
+.tb-search {{ display: inline-flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-width: 200px; padding: .25rem .4rem .25rem .7rem; margin-right: .2rem; color: var(--muted); background: var(--card); border: 1px solid var(--border); border-radius: 6px; font-size: .85rem; text-decoration: none; }}
+.tb-search:hover {{ color: var(--fg); border-color: var(--accent); }}
+kbd {{ font: 11px/1 var(--mono); color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: .15rem .35rem; }}
+
+/* sidebar */
+.sidebar {{ position: fixed; top: var(--tb-h); bottom: 0; left: 0; width: var(--sb-w); z-index: 65; overflow-y: auto; padding: .6rem .5rem 3rem; background: var(--side); border-right: 1px solid var(--border); font-size: .875rem; transition: transform .2s ease; }}
+[data-sidebar="hidden"] .sidebar {{ transform: translateX(-100%); }}
+.content {{ margin-left: var(--sb-w); transition: margin-left .2s ease; }}
+[data-sidebar="hidden"] .content {{ margin-left: 0; }}
+.scrim {{ display: none; }}
+@media (max-width: 800px) {{
+  .content {{ margin-left: 0; }}
+  [data-sidebar="shown"] .sidebar {{ box-shadow: 6px 0 24px rgba(0,0,0,.35); }}
+  [data-sidebar="shown"] .scrim {{ display: block; position: fixed; inset: var(--tb-h) 0 0 0; z-index: 64; background: rgba(0,0,0,.35); }}
+  .tb-search {{ min-width: 0; gap: 0; padding: .25rem .4rem; }}
+  .tb-search .lbl {{ display: none; }}
+}}
+.sb-head {{ padding: .2rem .5rem .7rem; margin-bottom: .4rem; border-bottom: 1px solid var(--border); font-weight: 600; font-size: .95rem; }}
+.sb-head a {{ display: flex; align-items: center; gap: .5rem; color: var(--fg); text-decoration: none; }}
+.sb-head a:hover {{ color: var(--accent); }}
+.sb-head img {{ width: 18px; height: 18px; }}
+.sb-pad {{ padding: 0 .5rem; }}
+.tree summary {{ display: flex; align-items: center; gap: .35rem; padding: .15rem .4rem; border-radius: 5px; white-space: nowrap; }}
+.tree summary:hover {{ background: var(--hover); }}
+.tree summary::before {{ flex: none; width: .9em; font-size: .8em; }}
+.tree .t-name {{ overflow: hidden; text-overflow: ellipsis; }}
+.tree .count {{ margin-left: auto; padding-left: .5rem; font-size: .72rem; }}
+.t-module {{ margin-top: .3rem; }}
+.t-module > summary {{ font-weight: 600; }}
+.t-module > summary .t-name {{ font-family: var(--mono); font-size: .84rem; }}
+.t-provider, .t-group {{ margin-left: .8rem; }}
+.t-provider > summary .t-name {{ font-weight: 500; }}
+.t-group > summary {{ color: var(--muted); font-size: .8rem; }}
+.tree ul {{ margin: 0 0 .1rem 1.05rem; padding: 0 0 0 .1rem; border-left: 1px solid var(--border); }}
+.tree li {{ padding: 0; }}
+.tree li a, .tree .t-leaf {{ display: block; padding: .12rem .5rem; border: 0; border-radius: 5px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.tree li a:hover {{ color: var(--accent); background: var(--hover); }}
+.tree li a.active {{ color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); font-weight: 600; }}
+.tree li a.dim, .tree .t-leaf {{ color: var(--muted); }}
+.tree li a.ext::after {{ content: " ↗"; color: var(--muted); font-size: .75em; }}
+.t-empty {{ margin: 0 0 .1rem 2.2rem; color: var(--muted); font-size: .78rem; font-style: italic; }}
+.pill {{ flex: none; font-size: .62rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; line-height: 1.5; padding: 0 .45rem; border: 1px solid currentColor; border-radius: 999px; }}
+.pill.ok {{ color: #22c55e; }}
+.pill.warn {{ color: #eab308; }}
+.pill.off {{ color: var(--muted); }}
+
+/* configuration */
+.cfg-dialog {{ width: min(720px, calc(100vw - 2rem)); max-height: calc(100vh - 4rem); padding: 0; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 24px 64px rgba(0,0,0,.45); }}
+.cfg-dialog::backdrop {{ background: rgba(0,0,0,.45); backdrop-filter: blur(2px); }}
+.dlg-bar {{ position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: .45rem .5rem .45rem 1rem; background: var(--bg); border-bottom: 1px solid var(--border); font-weight: 600; }}
+#cfg-body {{ padding: 1rem; }}
+.cfg code {{ font: .8rem var(--mono); background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: .05rem .35rem; word-break: break-all; }}
+.cfg-path {{ color: var(--muted); font-size: .8rem; margin-bottom: .8rem; }}
+.cfg-provider {{ background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin: 0 0 .75rem; overflow: hidden; }}
+.cfg-provider > header {{ display: flex; align-items: center; gap: .5rem; padding: .5rem .8rem; }}
+.cfg-provider > header .pill {{ margin-left: auto; }}
+.cfg-kind {{ color: var(--muted); font-size: .8rem; font-family: var(--mono); }}
+.cfg-row {{ display: grid; grid-template-columns: 150px 1fr; gap: .75rem; padding: .4rem .8rem; border-top: 1px solid var(--border); font-size: .85rem; }}
+.cfg-row .k {{ color: var(--muted); font-family: var(--mono); font-size: .8rem; padding-top: .1rem; }}
+.cfg-row .v {{ display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; min-width: 0; }}
+.chip {{ font-size: .78rem; padding: 0 .45rem; border: 1px solid var(--border); border-radius: 4px; }}
+.chip.off {{ color: var(--muted); text-decoration: line-through; opacity: .7; }}
+.env {{ font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }}
+.env.ok {{ color: #22c55e; }}
+.env.missing {{ color: #ef4444; }}
+.redacted {{ color: var(--muted); font-style: italic; }}
+.cfg-raw > summary {{ color: var(--muted); font-size: .85rem; margin-top: .25rem; }}
+.cfg-raw pre {{ background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: .8rem 1rem; overflow: auto; }}
+.cfg-raw pre code {{ border: 0; padding: 0; background: none; word-break: normal; }}
 h1 {{ font-size: 1.5rem; margin: 0 0 1.5rem; }}
 .brand {{ color: var(--accent); }}
 h2 {{ font-size: 1.05rem; color: var(--accent); margin: 0; display: inline; }}
@@ -860,8 +1332,8 @@ h3 {{ font-size: .95rem; margin: 0; display: inline; }}
 h4 {{ font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: .9rem 0 .3rem; }}
 h4.project {{ color: var(--accent); text-transform: none; letter-spacing: 0; font-size: .9rem; }}
 .count {{ color: var(--muted); font-weight: 400; font-size: .8rem; }}
-details.provider {{ margin: 1.25rem 0; }}
-details.provider > summary {{ border-bottom: 1px solid var(--border); padding-bottom: .3rem; margin-bottom: 1rem; }}
+details.provider {{ margin: 1.25rem 0; padding: .75rem 1.1rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }}
+details.provider[open] > summary {{ border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .75rem; }}
 details.module {{ margin: .5rem 0 .5rem .25rem; }}
 details.module > summary {{ margin: .5rem 0 .4rem; }}
 summary {{ list-style: none; cursor: pointer; user-select: none; }}
@@ -897,8 +1369,6 @@ li a:hover {{ color: var(--accent); border-color: var(--accent); }}
 .markdown blockquote {{ border-left: 3px solid var(--accent); margin: 1rem 0; padding: .1rem 1rem; color: var(--muted); }}
 .markdown table {{ border-collapse: collapse; }}
 .markdown th, .markdown td {{ border: 1px solid var(--border); padding: .35rem .6rem; }}
-.theme-toggle {{ position: fixed; top: 1rem; right: 1rem; background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: .35rem .6rem; font-size: .85rem; cursor: pointer; line-height: 1; }}
-.theme-toggle:hover {{ border-color: var(--accent); color: var(--accent); }}
 .nav {{ color: var(--accent); text-decoration: none; font-size: .9rem; }}
 .nav:hover {{ text-decoration: underline; }}
 .search-input {{ width: 100%; background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: .6rem .8rem; font-size: 1rem; margin: .5rem 0 1.5rem; }}
@@ -931,13 +1401,104 @@ li a:hover {{ color: var(--accent); border-color: var(--accent); }}
 </style>
 </head>
 <body>
-<button class="theme-toggle" onclick="bancoToggleTheme()" title="Toggle theme" aria-label="Toggle theme"></button>
-<main>{body}</main>
+<header class="topbar">
+  <button class="icon-btn" onclick="bancoToggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar" aria-controls="sidebar">
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" stroke-width="1.3"/></svg>
+  </button>
+  <a class="tb-brand" href="/"><img src="/favicon.svg" alt=""><span class="brand">banco</span></a>
+  <span class="tb-title">{title}</span>
+  <span class="tb-spacer"></span>
+  <a class="tb-search" href="/search"><span class="lbl">Search</span><kbd>/</kbd></a>
+  <button class="icon-btn" onclick="bancoShowConfig()" title="Configuration" aria-label="Configuration">
+    <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+  <button class="icon-btn theme-toggle" onclick="bancoToggleTheme()" title="Toggle theme" aria-label="Toggle theme"></button>
+</header>
+<aside class="sidebar" id="sidebar">{sidebar}</aside>
+<div class="scrim" onclick="bancoToggleSidebar()"></div>
+<div class="content"><main>{body}</main></div>
+<dialog id="cfg-dialog" class="cfg-dialog">
+  <div class="dlg-bar"><span>Configuration</span><button class="icon-btn" onclick="this.closest('dialog').close()" aria-label="Close">✕</button></div>
+  <div id="cfg-body"></div>
+</dialog>
+<script>
+function bancoToggleSidebar() {{
+  var el = document.documentElement;
+  var next = el.getAttribute("data-sidebar") === "hidden" ? "shown" : "hidden";
+  el.setAttribute("data-sidebar", next);
+  // Only remember the choice on wide screens, where the sidebar docks.
+  if (!matchMedia("(max-width: 800px)").matches) {{
+    try {{ localStorage.setItem("banco-sidebar", next); }} catch (e) {{}}
+  }}
+}}
+
+function bancoShowConfig() {{
+  var dlg = document.getElementById("cfg-dialog");
+  var body = document.getElementById("cfg-body");
+  body.innerHTML = '<p class="muted">Loading…</p>';
+  dlg.showModal();
+  fetch("/config?partial=1")
+    .then(function (r) {{ if (!r.ok) throw new Error(r.status); return r.text(); }})
+    .then(function (html) {{ body.innerHTML = html; }})
+    .catch(function () {{ body.innerHTML = '<p class="err">Could not load configuration.</p>'; }});
+}}
+document.getElementById("cfg-dialog").addEventListener("click", function (e) {{
+  if (e.target === this) this.close();  // click on the backdrop
+}});
+
+// Sidebar tree: restore per-node open state, highlight the current page and
+// expand its ancestors, and keep the scroll position across navigation.
+(function () {{
+  var sb = document.getElementById("sidebar");
+  var KEY = "banco-tree";
+  var state;
+  try {{ state = JSON.parse(localStorage.getItem(KEY) || "{{}}"); }} catch (e) {{ state = {{}}; }}
+  sb.querySelectorAll("details[data-tree]").forEach(function (d) {{
+    var id = d.getAttribute("data-tree");
+    if (Object.prototype.hasOwnProperty.call(state, id)) d.open = !!state[id];
+  }});
+  // Persist on user clicks only, so auto-expanding the active path isn't saved.
+  sb.addEventListener("click", function (e) {{
+    var s = e.target.closest("summary");
+    if (!s || !sb.contains(s)) return;
+    var d = s.parentElement;
+    state[d.getAttribute("data-tree")] = !d.open;  // runs before the toggle
+    try {{ localStorage.setItem(KEY, JSON.stringify(state)); }} catch (e) {{}}
+  }});
+
+  function norm(h) {{ try {{ return decodeURIComponent(h); }} catch (e) {{ return h; }} }}
+  var here = norm(location.pathname + location.search);
+  var active = null;
+  sb.querySelectorAll(".tree a[href]").forEach(function (a) {{
+    if (norm(a.getAttribute("href")) === here) {{ a.classList.add("active"); active = a; }}
+  }});
+  if (active) {{
+    for (var p = active.parentElement; p && p !== sb; p = p.parentElement) {{
+      if (p.tagName === "DETAILS") p.open = true;
+    }}
+  }}
+
+  try {{
+    var y = sessionStorage.getItem("banco-sb-scroll");
+    if (y) sb.scrollTop = +y;
+  }} catch (e) {{}}
+  if (active) {{
+    var r = active.getBoundingClientRect(), sr = sb.getBoundingClientRect();
+    if (r.top < sr.top || r.bottom > sr.bottom) active.scrollIntoView({{ block: "center" }});
+  }}
+  addEventListener("pagehide", function () {{
+    try {{ sessionStorage.setItem("banco-sb-scroll", String(sb.scrollTop)); }} catch (e) {{}}
+  }});
+}})();
+</script>
 <script>
 function bancoApplyThemeLabel() {{
   var t = document.documentElement.getAttribute("data-theme");
   var b = document.querySelector(".theme-toggle");
-  if (b) b.textContent = t === "light" ? "◐ dark" : "◑ light";
+  if (b) {{
+    b.textContent = t === "light" ? "☾" : "☀";
+    b.title = t === "light" ? "Switch to dark theme" : "Switch to light theme";
+  }}
 }}
 function bancoToggleTheme() {{
   var t = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";

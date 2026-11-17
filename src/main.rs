@@ -97,19 +97,24 @@ fn print_check_findings(root: &Path, findings: &CheckFindings) {
     }
 }
 
+/// The modules a provider kind implements, before `disabled_modules` applies.
+pub(crate) fn provider_kind_modules(kind: &str) -> Vec<&'static str> {
+    match kind {
+        "local"  => LocalProvider::available_modules(),
+        "github" => GitHubProvider::available_modules(),
+        "gitlab" => GitLabProvider::available_modules(),
+        "gerrit" => GerritProvider::available_modules(),
+        "jira"   => JiraProvider::available_modules(),
+        _        => vec![],
+    }
+}
+
 fn check_config(root: &Path) -> anyhow::Result<Vec<String>> {
     let project_config = config::load(root)?;
     let mut issues = Vec::new();
 
     for entry in &project_config.providers {
-        let modules: Vec<&str> = match entry.name.as_str() {
-            "local"  => LocalProvider::available_modules(),
-            "github" => GitHubProvider::available_modules(),
-            "gitlab" => GitLabProvider::available_modules(),
-            "gerrit" => GerritProvider::available_modules(),
-            "jira"   => JiraProvider::available_modules(),
-            _        => vec![],
-        };
+        let modules = provider_kind_modules(&entry.name);
 
         let label = match &entry.alias {
             Some(alias) => format!("provider '{}' (alias '{}')", entry.name, alias),
